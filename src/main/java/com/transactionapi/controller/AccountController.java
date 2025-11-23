@@ -51,7 +51,7 @@ public class AccountController {
     @GetMapping("/{id}")
     public AccountResponse getAccount(
             Authentication authentication,
-            @PathVariable("id") UUID id
+            @PathVariable UUID id
     ) {
         String caller = userIdResolver.requireUserId(authentication);
         return accountService.getAccount(id, caller);

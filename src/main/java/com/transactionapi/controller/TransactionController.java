@@ -33,7 +33,7 @@ public class TransactionController {
     @PostMapping
     public ResponseEntity<TransactionResponse> createTransaction(
             Authentication authentication,
-            @PathVariable("accountId") UUID accountId,
+            @PathVariable UUID accountId,
             @Valid @RequestBody CreateTransactionRequest request
     ) {
         String caller = userIdResolver.requireUserId(authentication);
@@ -44,7 +44,7 @@ public class TransactionController {
     @GetMapping
     public List<TransactionResponse> listTransactions(
             Authentication authentication,
-            @PathVariable("accountId") UUID accountId
+            @PathVariable UUID accountId
     ) {
         String caller = userIdResolver.requireUserId(authentication);
         return transactionService.listTransactions(accountId, caller);
