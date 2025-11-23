@@ -17,6 +17,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
 import org.springframework.lang.NonNull;
@@ -107,7 +108,7 @@ public class Transaction {
 
     @NonNull
     public UUID getId() {
-        return id;
+        return Objects.requireNonNull(id);
     }
 
     public Account getAccount() {

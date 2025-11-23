@@ -6,9 +6,11 @@ import com.transactionapi.model.Account;
 import com.transactionapi.model.Transaction;
 import com.transactionapi.repository.TransactionRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,8 +27,8 @@ public class TransactionService {
         this.accountService = accountService;
     }
 
-    public TransactionResponse createTransaction(UUID accountId, CreateTransactionRequest request, String userId) {
-        Account account = accountService.loadOwnedAccount(accountId, userId);
+    public TransactionResponse createTransaction(@NonNull UUID accountId, CreateTransactionRequest request, String userId) {
+        Account account = accountService.loadOwnedAccount(Objects.requireNonNull(accountId), userId);
 
         Transaction transaction = new Transaction();
         transaction.setAccount(account);
@@ -51,7 +53,7 @@ public class TransactionService {
         transaction.setNotes(request.notes());
 
         if (request.relatedTransactionId() != null) {
-            Transaction related = transactionRepository.findById(request.relatedTransactionId())
+            Transaction related = transactionRepository.findById(Objects.requireNonNull(request.relatedTransactionId()))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Related transaction not found"));
             String relatedUser = related.getAccount().getUserId();
             if (!relatedUser.equals(userId)) {
@@ -65,7 +67,7 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> listTransactions(UUID accountId, String userId) {
-        accountService.loadOwnedAccount(accountId, userId);
+        accountService.loadOwnedAccount(Objects.requireNonNull(accountId), userId);
         return transactionRepository.findByAccountIdOrderByOccurredAtDesc(accountId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());

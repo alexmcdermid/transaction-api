@@ -8,12 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -51,7 +53,7 @@ class TransactionControllerTest {
                 """;
 
         MvcResult txResult = mockMvc.perform(post("/api/v1/accounts/{id}/transactions", accountId)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .header(USER_HEADER, USER)
                         .content(payload))
                 .andExpect(status().isCreated())
@@ -79,6 +81,7 @@ class TransactionControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @NonNull
     private UUID createAccount(String name) throws Exception {
         String payload = """
                 {
@@ -89,13 +92,13 @@ class TransactionControllerTest {
                 """.formatted(name);
 
         MvcResult result = mockMvc.perform(post("/api/v1/accounts")
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .header(USER_HEADER, USER)
-                        .content(payload))
+                        .content(Objects.requireNonNull(payload)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsString());
-        return UUID.fromString(node.get("id").asText());
+        return Objects.requireNonNull(UUID.fromString(node.get("id").asText()));
     }
 }

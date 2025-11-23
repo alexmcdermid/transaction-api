@@ -2,7 +2,7 @@ package com.transactionapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.when;
 
 import com.transactionapi.constants.AccountStatus;
@@ -14,6 +14,7 @@ import com.transactionapi.repository.AccountRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,8 +41,8 @@ class AccountServiceTest {
     @Test
     void createAccountSetsFields() {
         CreateAccountRequest request = new CreateAccountRequest("Checking", AccountType.BANK, "cad", "Bank");
-        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
-            Account acc = invocation.getArgument(0);
+        when(accountRepository.save(Objects.requireNonNull(notNull()))).thenAnswer(invocation -> {
+            Account acc = Objects.requireNonNull(invocation.getArgument(0));
             acc.setCurrency(acc.getCurrency().toUpperCase());
             acc.setStatus(AccountStatus.ACTIVE);
             return acc;
@@ -69,13 +71,15 @@ class AccountServiceTest {
     void loadOwnedAccountThrowsForWrongUser() {
         UUID id = UUID.randomUUID();
         Account other = account("other", id, "Other");
-        when(accountRepository.findById(id)).thenReturn(Optional.of(other));
+        UUID otherId = Objects.requireNonNull(other.getId());
+        when(accountRepository.findById(otherId)).thenReturn(Optional.of(other));
 
-        assertThatThrownBy(() -> accountService.loadOwnedAccount(id, "user-1"))
+        assertThatThrownBy(() -> accountService.loadOwnedAccount(otherId, "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("statusCode", HttpStatus.NOT_FOUND);
     }
 
+    @NonNull
     private Account account(String userId, UUID id, String name) {
         Account acc = new Account();
         acc.setUserId(userId);

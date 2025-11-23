@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
 import org.springframework.lang.NonNull;
@@ -65,7 +66,7 @@ public class Account {
 
     @NonNull
     public UUID getId() {
-        return id;
+        return Objects.requireNonNull(id);
     }
 
     public String getUserId() {

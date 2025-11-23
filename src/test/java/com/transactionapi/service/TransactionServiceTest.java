@@ -2,7 +2,7 @@ package com.transactionapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.when;
 
 import com.transactionapi.constants.OptionType;
@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,8 +52,8 @@ class TransactionServiceTest {
 
         when(accountService.loadOwnedAccount(account.getId(), "user-1")).thenReturn(account);
         when(transactionRepository.findById(relatedId)).thenReturn(Optional.of(related));
-        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
-            Transaction tx = invocation.getArgument(0);
+        when(transactionRepository.save(Objects.requireNonNull(notNull()))).thenAnswer(invocation -> {
+            Transaction tx = Objects.requireNonNull(invocation.getArgument(0));
             tx.setOccurredAt(Instant.now());
             return tx;
         });
@@ -130,6 +131,7 @@ class TransactionServiceTest {
         assertThat(responses.get(0).id()).isEqualTo(tx.getId());
     }
 
+    @NonNull
     private Account account(UUID id, String userId) {
         Account account = new Account();
         account.setUserId(userId);
@@ -144,6 +146,7 @@ class TransactionServiceTest {
         return account;
     }
 
+    @NonNull
     private Transaction transaction(UUID id, Account account) {
         Transaction tx = new Transaction();
         tx.setAccount(account);

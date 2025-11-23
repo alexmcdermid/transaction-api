@@ -7,6 +7,7 @@ import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.AccountService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,6 +55,6 @@ public class AccountController {
             @PathVariable UUID id
     ) {
         String caller = userIdResolver.requireUserId(authentication);
-        return accountService.getAccount(id, caller);
+        return accountService.getAccount(Objects.requireNonNull(id), caller);
     }
 }

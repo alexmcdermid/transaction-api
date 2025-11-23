@@ -7,6 +7,7 @@ import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.TransactionService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +38,7 @@ public class TransactionController {
             @Valid @RequestBody CreateTransactionRequest request
     ) {
         String caller = userIdResolver.requireUserId(authentication);
-        TransactionResponse response = transactionService.createTransaction(accountId, request, caller);
+        TransactionResponse response = transactionService.createTransaction(Objects.requireNonNull(accountId), request, caller);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

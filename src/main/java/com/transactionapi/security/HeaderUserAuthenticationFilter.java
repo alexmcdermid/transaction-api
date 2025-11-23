@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.lang.NonNull;
 
 @Component
 public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
@@ -24,7 +25,11 @@ public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
     private String headerName;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    )
             throws ServletException, IOException {
         if (allowHeaderAuth && SecurityContextHolder.getContext().getAuthentication() == null) {
             String userId = request.getHeader(headerName);

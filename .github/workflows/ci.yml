@@ -1,3 +1,4 @@
+# noinspection YAMLSchemaValidation,GithubUnresolvedReference
 name: CI
 
 on:
@@ -19,61 +20,61 @@ jobs:
           cache: maven
       - name: Run tests
         run: mvn -B -ntp test
-
-  docker-publish:
-    needs: test
-    if: false  # Disabled for now
-    runs-on: ubuntu-latest
-    environment: Development
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-      ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-      ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Build and push Docker image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          REPO_NAME=${REPOSITORY:-transaction-api}
-          IMAGE="$REGISTRY/$REPO_NAME:$IMAGE_TAG"
-          docker build -t "$IMAGE" .
-          docker tag "$IMAGE" "$REGISTRY/$REPO_NAME:latest"
-          docker push "$IMAGE"
-          docker push "$REGISTRY/$REPO_NAME:latest"
-      - name: Deploy to ECS service
-        if: env.ECS_CLUSTER != '' && env.ECS_SERVICE != ''
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          REPO_NAME=${REPOSITORY:-transaction-api}
-          IMAGE="$REGISTRY/$REPO_NAME:$IMAGE_TAG"
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$ECS_SERVICE" \
-            --force-new-deployment \
-            --region "$AWS_REGION" \
-            --output text
+  # todo
+  # docker-publish:
+  #   needs: test
+  #   if: false  # Disabled for now
+  #   runs-on: ubuntu-latest
+  #   environment: Development
+  #   permissions:
+  #     id-token: write
+  #     contents: read
+    # env:
+      # AWS_REGION: ${{ secrets.AWS_REGION }}
+      # AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      # ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      # ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+      # ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+    # steps:
+    #   - uses: actions/checkout@v4
+    #   - name: Set up Java
+    #     uses: actions/setup-java@v4
+    #     with:
+    #       distribution: temurin
+    #       java-version: 21
+    #       cache: maven
+    #   - name: Configure AWS credentials (OIDC)
+    #     uses: aws-actions/configure-aws-credentials@v4
+    #     with:
+    #       role-to-assume: ${{ env.AWS_ROLE_ARN }}
+    #       aws-region: ${{ env.AWS_REGION }}
+    #   - name: Log in to Amazon ECR
+    #     id: login-ecr
+    #     uses: aws-actions/amazon-ecr-login@v1
+    #   - name: Build and push Docker image
+    #     env:
+    #       REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    #       REPOSITORY: ${{ env.ECR_REPOSITORY }}
+    #       IMAGE_TAG: ${{ github.sha }}
+    #     run: |
+    #       REPO_NAME=${REPOSITORY:-transaction-api}
+    #       IMAGE="$REGISTRY/$REPO_NAME:$IMAGE_TAG"
+    #       docker build -t "$IMAGE" .
+    #       docker tag "$IMAGE" "$REGISTRY/$REPO_NAME:latest"
+    #       docker push "$IMAGE"
+    #       docker push "$REGISTRY/$REPO_NAME:latest"
+    #   - name: Deploy to ECS service
+    #     if: env.ECS_CLUSTER != '' && env.ECS_SERVICE != ''
+    #     env:
+    #       REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    #       REPOSITORY: ${{ env.ECR_REPOSITORY }}
+    #       IMAGE_TAG: ${{ github.sha }}
+    #     run: |
+    #       REPO_NAME=${REPOSITORY:-transaction-api}
+    #       IMAGE="$REGISTRY/$REPO_NAME:$IMAGE_TAG"
+    #       aws ecs update-service \
+    #         --cluster "$ECS_CLUSTER" \
+    #         --service "$ECS_SERVICE" \
+    #         --force-new-deployment \
+    #         --region "$AWS_REGION" \
+    #         --output text

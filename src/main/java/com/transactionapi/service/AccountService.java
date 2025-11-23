@@ -6,9 +6,11 @@ import com.transactionapi.dto.CreateAccountRequest;
 import com.transactionapi.repository.AccountRepository;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -38,12 +40,12 @@ public class AccountService {
                 .collect(Collectors.toList());
     }
 
-    public AccountResponse getAccount(UUID id, String userId) {
+    public AccountResponse getAccount(@NonNull UUID id, String userId) {
         return toResponse(loadOwnedAccount(id, userId));
     }
 
-    public Account loadOwnedAccount(UUID id, String userId) {
-        Account account = accountRepository.findById(id)
+    public Account loadOwnedAccount(@NonNull UUID id, String userId) {
+        Account account = accountRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         if (!account.getUserId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found");
