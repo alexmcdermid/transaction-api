@@ -1,5 +1,6 @@
 package com.transactionapi.model;
 
+import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,8 +16,10 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "transactions")
@@ -38,13 +41,35 @@ public class Transaction {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 
+    @Column(length = 4)
+    private String ticker;
+
+    @Column(length = 255)
+    private String name;
+
+    @Column(nullable = false, length = 3)
+    private String currency = "CAD";
+
     @Column(length = 20)
-    private String symbol;
+    private String exchange;
 
     private Integer quantity;
 
     @Column(precision = 18, scale = 4)
     private BigDecimal price;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "option_type", length = 10)
+    private OptionType optionType;
+
+    @Column(name = "strike_price", precision = 18, scale = 4)
+    private BigDecimal strikePrice;
+
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
+
+    @Column(name = "underlying_ticker", length = 4)
+    private String underlyingTicker;
 
     @Column(precision = 18, scale = 2)
     private BigDecimal fee;
@@ -80,6 +105,7 @@ public class Transaction {
         updatedAt = Instant.now();
     }
 
+    @NonNull
     public UUID getId() {
         return id;
     }
@@ -108,12 +134,36 @@ public class Transaction {
         this.amount = amount;
     }
 
-    public String getSymbol() {
-        return symbol;
+    public String getTicker() {
+        return ticker;
     }
 
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
+    public void setTicker(String ticker) {
+        this.ticker = ticker;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public String getExchange() {
+        return exchange;
+    }
+
+    public void setExchange(String exchange) {
+        this.exchange = exchange;
     }
 
     public Integer getQuantity() {
@@ -138,6 +188,38 @@ public class Transaction {
 
     public void setFee(BigDecimal fee) {
         this.fee = fee;
+    }
+
+    public OptionType getOptionType() {
+        return optionType;
+    }
+
+    public void setOptionType(OptionType optionType) {
+        this.optionType = optionType;
+    }
+
+    public BigDecimal getStrikePrice() {
+        return strikePrice;
+    }
+
+    public void setStrikePrice(BigDecimal strikePrice) {
+        this.strikePrice = strikePrice;
+    }
+
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    public void setExpiryDate(LocalDate expiryDate) {
+        this.expiryDate = expiryDate;
+    }
+
+    public String getUnderlyingTicker() {
+        return underlyingTicker;
+    }
+
+    public void setUnderlyingTicker(String underlyingTicker) {
+        this.underlyingTicker = underlyingTicker;
     }
 
     public Transaction getRelatedTransaction() {

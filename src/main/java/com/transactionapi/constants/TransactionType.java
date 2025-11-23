@@ -8,5 +8,7 @@ public enum TransactionType {
     SELL,
     FEE,
     DIVIDEND,
-    ASSIGNMENT
+    ASSIGNMENT,
+    EXERCISE,
+    EXPIRATION
 }

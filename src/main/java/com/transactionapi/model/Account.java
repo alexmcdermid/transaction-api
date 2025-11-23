@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Table(name = "accounts")
@@ -62,6 +63,7 @@ public class Account {
         this.updatedAt = Instant.now();
     }
 
+    @NonNull
     public UUID getId() {
         return id;
     }

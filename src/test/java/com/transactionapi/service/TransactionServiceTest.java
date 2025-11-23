@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import com.transactionapi.dto.CreateTransactionRequest;
 import com.transactionapi.dto.TransactionResponse;
@@ -13,6 +14,8 @@ import com.transactionapi.model.Transaction;
 import com.transactionapi.repository.TransactionRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Objects;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,9 +47,10 @@ class TransactionServiceTest {
     void createTransactionAssignsRelatedWhenSameUser() {
         Account account = account(UUID.randomUUID(), "user-1");
         Transaction related = transaction(UUID.randomUUID(), account);
+        UUID relatedId = Objects.requireNonNull(related.getId());
 
         when(accountService.loadOwnedAccount(account.getId(), "user-1")).thenReturn(account);
-        when(transactionRepository.findById(related.getId())).thenReturn(Optional.of(related));
+        when(transactionRepository.findById(relatedId)).thenReturn(Optional.of(related));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
             Transaction tx = invocation.getArgument(0);
             tx.setOccurredAt(Instant.now());
@@ -60,14 +64,21 @@ class TransactionServiceTest {
                 null,
                 null,
                 null,
-                related.getId(),
+                null,
+                null,
+                OptionType.CALL,
+                new BigDecimal("10.00"),
+                LocalDate.parse("2024-06-21"),
+                "AAPL",
+                null,
+                relatedId,
                 Instant.parse("2024-01-01T00:00:00Z"),
                 "note"
         );
 
         TransactionResponse response = transactionService.createTransaction(account.getId(), request, "user-1");
 
-        assertThat(response.relatedTransactionId()).isEqualTo(related.getId());
+        assertThat(response.relatedTransactionId()).isEqualTo(relatedId);
         assertThat(response.amount()).isEqualByComparingTo("100.00");
         assertThat(response.type()).isEqualTo(TransactionType.DEPOSIT);
     }
@@ -77,9 +88,10 @@ class TransactionServiceTest {
         Account account = account(UUID.randomUUID(), "user-1");
         Account otherAccount = account(UUID.randomUUID(), "other");
         Transaction related = transaction(UUID.randomUUID(), otherAccount);
+        UUID relatedId = Objects.requireNonNull(related.getId());
 
         when(accountService.loadOwnedAccount(account.getId(), "user-1")).thenReturn(account);
-        when(transactionRepository.findById(related.getId())).thenReturn(Optional.of(related));
+        when(transactionRepository.findById(relatedId)).thenReturn(Optional.of(related));
 
         CreateTransactionRequest request = new CreateTransactionRequest(
                 TransactionType.DEPOSIT,
@@ -88,7 +100,14 @@ class TransactionServiceTest {
                 null,
                 null,
                 null,
-                related.getId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                relatedId,
                 Instant.now(),
                 null
         );

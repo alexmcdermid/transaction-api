@@ -32,9 +32,20 @@ public class TransactionService {
         transaction.setAccount(account);
         transaction.setType(request.type());
         transaction.setAmount(request.amount());
-        transaction.setSymbol(request.symbol());
+        if (request.currency() != null) {
+            transaction.setCurrency(request.currency());
+        } else {
+            transaction.setCurrency(account.getCurrency());
+        }
+        transaction.setTicker(request.ticker());
+        transaction.setName(request.name());
+        transaction.setExchange(request.exchange());
         transaction.setQuantity(request.quantity());
         transaction.setPrice(request.price());
+        transaction.setOptionType(request.optionType());
+        transaction.setStrikePrice(request.strikePrice());
+        transaction.setExpiryDate(request.expiryDate());
+        transaction.setUnderlyingTicker(request.underlyingTicker());
         transaction.setFee(request.fee());
         transaction.setOccurredAt(request.occurredAt());
         transaction.setNotes(request.notes());
@@ -69,9 +80,16 @@ public class TransactionService {
                 transaction.getAccount().getId(),
                 transaction.getType(),
                 transaction.getAmount(),
-                transaction.getSymbol(),
+                transaction.getTicker(),
+                transaction.getName(),
+                transaction.getCurrency(),
+                transaction.getExchange(),
                 transaction.getQuantity(),
                 transaction.getPrice(),
+                transaction.getOptionType(),
+                transaction.getStrikePrice(),
+                transaction.getExpiryDate(),
+                transaction.getUnderlyingTicker(),
                 transaction.getFee(),
                 relatedId,
                 transaction.getOccurredAt(),

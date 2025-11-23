@@ -31,7 +31,7 @@ A minimal Spring Boot 3 / Java 21 service for recording financial transactions a
 - `GET /api/v1/accounts/{id}/transactions` — list transactions on the account.
 - `GET /api/v1/health` — basic health check.
 
-Transactions support optional trade fields (`symbol`, `quantity`, `price`, `fee`) and linkage via `relatedTransactionId` for transfers.
+Transactions support richer trade fields (`ticker`, `name`, `currency`, `exchange`, `quantity`, `price`, option details, `fee`) and linkage via `relatedTransactionId` for transfers. When `optionType` is provided, `strikePrice`, `expiryDate`, and `underlyingTicker` are required; transaction types also cover option lifecycle events (e.g., exercises, expirations).
 
 ## Authentication scaffolding
 
