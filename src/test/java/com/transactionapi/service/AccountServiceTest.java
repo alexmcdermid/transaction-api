@@ -2,7 +2,7 @@ package com.transactionapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.transactionapi.constants.AccountStatus;
@@ -26,6 +26,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class AccountServiceTest {
 
     @Mock
@@ -41,8 +42,8 @@ class AccountServiceTest {
     @Test
     void createAccountSetsFields() {
         CreateAccountRequest request = new CreateAccountRequest("Checking", AccountType.BANK, "cad", "Bank");
-        when(accountRepository.save(Objects.requireNonNull(notNull()))).thenAnswer(invocation -> {
-            Account acc = Objects.requireNonNull(invocation.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
+            Account acc = Objects.requireNonNull(invocation.getArgument(0, Account.class));
             acc.setCurrency(acc.getCurrency().toUpperCase());
             acc.setStatus(AccountStatus.ACTIVE);
             return acc;

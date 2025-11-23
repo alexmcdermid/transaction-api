@@ -2,7 +2,7 @@ package com.transactionapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.transactionapi.constants.OptionType;
@@ -29,6 +29,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class TransactionServiceTest {
 
     @Mock
@@ -52,8 +53,8 @@ class TransactionServiceTest {
 
         when(accountService.loadOwnedAccount(account.getId(), "user-1")).thenReturn(account);
         when(transactionRepository.findById(relatedId)).thenReturn(Optional.of(related));
-        when(transactionRepository.save(Objects.requireNonNull(notNull()))).thenAnswer(invocation -> {
-            Transaction tx = Objects.requireNonNull(invocation.getArgument(0));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction tx = Objects.requireNonNull(invocation.getArgument(0, Transaction.class));
             tx.setOccurredAt(Instant.now());
             return tx;
         });
