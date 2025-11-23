@@ -1,0 +1,14 @@
+target/
+.idea/
+.project
+.classpath
+.settings/
+.vscode/
+
+*.log
+*.iml
+
+.DS_Store
+
+# Local overrides
+src/main/resources/application-local.properties
