@@ -55,6 +55,11 @@ class TransactionServiceTest {
         when(transactionRepository.findById(relatedId)).thenReturn(Optional.of(related));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
             Transaction tx = Objects.requireNonNull(invocation.getArgument(0, Transaction.class));
+            try {
+                setTransactionId(tx, UUID.randomUUID());
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
             tx.setOccurredAt(Instant.now());
             return tx;
         });
@@ -155,11 +160,15 @@ class TransactionServiceTest {
         tx.setAmount(new BigDecimal("1.00"));
         tx.setOccurredAt(Instant.now());
         try {
-            var idField = Transaction.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(tx, id);
+            setTransactionId(tx, id);
         } catch (ReflectiveOperationException ignored) {
         }
         return tx;
+    }
+
+    private void setTransactionId(Transaction tx, UUID id) throws ReflectiveOperationException {
+        var idField = Transaction.class.getDeclaredField("id");
+        idField.setAccessible(true);
+        idField.set(tx, id);
     }
 }

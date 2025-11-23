@@ -44,6 +44,11 @@ class AccountServiceTest {
         CreateAccountRequest request = new CreateAccountRequest("Checking", AccountType.BANK, "cad", "Bank");
         when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
             Account acc = Objects.requireNonNull(invocation.getArgument(0, Account.class));
+            try {
+                setAccountId(acc, UUID.randomUUID());
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
             acc.setCurrency(acc.getCurrency().toUpperCase());
             acc.setStatus(AccountStatus.ACTIVE);
             return acc;
@@ -89,19 +94,21 @@ class AccountServiceTest {
         acc.setName(name);
         acc.setType(AccountType.BANK);
         try {
-            var idField = Account.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(acc, id);
-
+            setAccountId(acc, id);
             var createdField = Account.class.getDeclaredField("createdAt");
             createdField.setAccessible(true);
             createdField.set(acc, Instant.now());
-
             var updatedField = Account.class.getDeclaredField("updatedAt");
             updatedField.setAccessible(true);
             updatedField.set(acc, Instant.now());
         } catch (ReflectiveOperationException ignored) {
         }
         return acc;
+    }
+
+    private void setAccountId(Account account, UUID id) throws ReflectiveOperationException {
+        var idField = Account.class.getDeclaredField("id");
+        idField.setAccessible(true);
+        idField.set(account, id);
     }
 }
