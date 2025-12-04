@@ -32,12 +32,12 @@ public record CreateTransactionRequest(
         String notes
 ) {
 
-    @AssertTrue(message = "strikePrice is required when optionType is set")
+    @AssertTrue(message = "strikePrice and expiryDate are required when optionType is set")
     public boolean isOptionFieldsValid() {
         if (optionType == null) {
             return true;
         }
-        return strikePrice != null;
+        return strikePrice != null && expiryDate != null;
     }
 
     @AssertTrue(message = "targetAccountId is required for TRANSFER")
