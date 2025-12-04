@@ -1,5 +1,7 @@
 package com.transactionapi.dto;
 
+import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.Exchange;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import java.math.BigDecimal;
@@ -14,14 +16,13 @@ public record TransactionResponse(
         BigDecimal amount,
         String ticker,
         String name,
-        String currency,
-        String exchange,
+        Currency currency,
+        Exchange exchange,
         Integer quantity,
         BigDecimal price,
         OptionType optionType,
         BigDecimal strikePrice,
         LocalDate expiryDate,
-        String underlyingTicker,
         BigDecimal fee,
         UUID relatedTransactionId,
         Instant occurredAt,

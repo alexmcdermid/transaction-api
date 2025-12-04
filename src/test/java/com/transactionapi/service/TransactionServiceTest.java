@@ -3,8 +3,12 @@ package com.transactionapi.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.Exchange;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import com.transactionapi.dto.CreateTransactionRequest;
@@ -19,9 +23,11 @@ import java.util.Objects;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -69,16 +75,16 @@ class TransactionServiceTest {
                 new BigDecimal("100.00"),
                 null,
                 null,
-                null,
-                null,
+                Currency.CAD,
+                Exchange.TSX,
                 null,
                 null,
                 OptionType.CALL,
                 new BigDecimal("10.00"),
                 LocalDate.parse("2024-06-21"),
-                "AAPL",
                 null,
                 relatedId,
+                null,
                 Instant.parse("2024-01-01T00:00:00Z"),
                 "note"
         );
@@ -105,9 +111,8 @@ class TransactionServiceTest {
                 new BigDecimal("50"),
                 null,
                 null,
-                null,
-                null,
-                null,
+                Currency.CAD,
+                Exchange.TSX,
                 null,
                 null,
                 null,
@@ -115,6 +120,7 @@ class TransactionServiceTest {
                 null,
                 null,
                 relatedId,
+                null,
                 Instant.now(),
                 null
         );
@@ -137,11 +143,63 @@ class TransactionServiceTest {
         assertThat(responses.get(0).id()).isEqualTo(tx.getId());
     }
 
+    @Test
+    void transferCreatesMirrorTransaction() throws Exception {
+        Account source = account(UUID.randomUUID(), "user-1");
+        Account target = account(UUID.randomUUID(), "user-1");
+        when(accountService.loadOwnedAccount(source.getId(), "user-1")).thenReturn(source);
+        when(accountService.loadOwnedAccount(target.getId(), "user-1")).thenReturn(target);
+
+        ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction tx = invocation.getArgument(0, Transaction.class);
+            setTransactionId(tx, UUID.randomUUID());
+            tx.setOccurredAt(Instant.now());
+            return tx;
+        });
+
+        CreateTransactionRequest request = new CreateTransactionRequest(
+                TransactionType.TRANSFER,
+                new BigDecimal("100.00"),
+                null,
+                null,
+                Currency.CAD,
+                Exchange.TSX,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                target.getId(),
+                Instant.now(),
+                null
+        );
+
+        TransactionResponse response = transactionService.createTransaction(source.getId(), request, "user-1");
+
+        verify(transactionRepository, times(3)).save(txCaptor.capture());
+        List<Transaction> saved = txCaptor.getAllValues();
+        Transaction sourceTx = saved.get(0);
+        Transaction mirrorTx = saved.get(1);
+        Transaction updatedSource = saved.get(2);
+
+        assertThat(sourceTx.getAccount().getId()).isEqualTo(source.getId());
+        assertThat(sourceTx.getAmount()).isEqualByComparingTo("-100.00");
+        assertThat(mirrorTx.getAccount().getId()).isEqualTo(target.getId());
+        assertThat(mirrorTx.getAmount()).isEqualByComparingTo("100.00");
+        assertThat(mirrorTx.getRelatedTransaction()).isEqualTo(sourceTx);
+        assertThat(updatedSource.getRelatedTransaction()).isEqualTo(mirrorTx);
+
+        Assertions.assertNotNull(response.id());
+    }
+
     @NonNull
     private Account account(UUID id, String userId) {
         Account account = new Account();
         account.setUserId(userId);
-        account.setCurrency("CAD");
+        account.setCurrency(Currency.CAD);
         account.setName("Name");
         try {
             var idField = Account.class.getDeclaredField("id");

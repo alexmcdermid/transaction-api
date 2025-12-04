@@ -1,11 +1,11 @@
 package com.transactionapi.service;
 
-import com.transactionapi.model.Account;
 import com.transactionapi.dto.AccountResponse;
 import com.transactionapi.dto.CreateAccountRequest;
+import com.transactionapi.model.Account;
 import com.transactionapi.repository.AccountRepository;
+import com.transactionapi.repository.TransactionRepository;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -18,9 +18,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
 
-    public AccountService(AccountRepository accountRepository) {
+    public AccountService(AccountRepository accountRepository, TransactionRepository transactionRepository) {
         this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     public AccountResponse createAccount(CreateAccountRequest request, String userId) {
@@ -29,7 +31,7 @@ public class AccountService {
         account.setName(request.name());
         account.setInstitution(request.institution());
         account.setType(request.type());
-        account.setCurrency(request.currency().toUpperCase(Locale.ROOT));
+        account.setCurrency(request.currency());
         Account saved = accountRepository.save(account);
         return toResponse(saved);
     }
@@ -61,6 +63,7 @@ public class AccountService {
                 account.getType(),
                 account.getCurrency(),
                 account.getStatus(),
+                transactionRepository.sumAmountsByAccountId(account.getId()),
                 account.getCreatedAt(),
                 account.getUpdatedAt()
         );

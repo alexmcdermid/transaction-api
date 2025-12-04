@@ -7,10 +7,13 @@ import static org.mockito.Mockito.when;
 
 import com.transactionapi.constants.AccountStatus;
 import com.transactionapi.constants.AccountType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.dto.AccountResponse;
 import com.transactionapi.dto.CreateAccountRequest;
 import com.transactionapi.model.Account;
 import com.transactionapi.repository.AccountRepository;
+import com.transactionapi.repository.TransactionRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,22 +29,25 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
 class AccountServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
 
+    @Mock
+    private TransactionRepository transactionRepository;
+
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(accountRepository);
+        accountService = new AccountService(accountRepository, transactionRepository);
     }
 
     @Test
     void createAccountSetsFields() {
-        CreateAccountRequest request = new CreateAccountRequest("Checking", AccountType.BANK, "cad", "Bank");
+        when(transactionRepository.sumAmountsByAccountId(any(UUID.class))).thenReturn(BigDecimal.ZERO);
+        CreateAccountRequest request = new CreateAccountRequest("Checking", AccountType.BANK, Currency.CAD, "Bank");
         when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
             Account acc = Objects.requireNonNull(invocation.getArgument(0, Account.class));
             try {
@@ -49,7 +55,7 @@ class AccountServiceTest {
             } catch (ReflectiveOperationException e) {
                 throw new RuntimeException(e);
             }
-            acc.setCurrency(acc.getCurrency().toUpperCase());
+            acc.setCurrency(Currency.CAD);
             acc.setStatus(AccountStatus.ACTIVE);
             return acc;
         });
@@ -58,7 +64,8 @@ class AccountServiceTest {
 
         assertThat(response.name()).isEqualTo("Checking");
         assertThat(response.type()).isEqualTo(AccountType.BANK);
-        assertThat(response.currency()).isEqualTo("CAD");
+        assertThat(response.currency()).isEqualTo(Currency.CAD);
+        assertThat(response.balance()).isEqualTo(BigDecimal.ZERO);
     }
 
     @Test
@@ -66,6 +73,8 @@ class AccountServiceTest {
         Account a1 = account("user-1", UUID.randomUUID(), "A");
         Account a2 = account("user-1", UUID.randomUUID(), "B");
         when(accountRepository.findByUserIdOrderByCreatedAtAsc("user-1")).thenReturn(List.of(a1, a2));
+        when(transactionRepository.sumAmountsByAccountId(a1.getId())).thenReturn(BigDecimal.ZERO);
+        when(transactionRepository.sumAmountsByAccountId(a2.getId())).thenReturn(BigDecimal.ZERO);
 
         List<AccountResponse> accounts = accountService.listAccounts("user-1");
 
@@ -90,7 +99,7 @@ class AccountServiceTest {
         Account acc = new Account();
         acc.setUserId(userId);
         acc.setInstitution("Bank");
-        acc.setCurrency("CAD");
+        acc.setCurrency(Currency.CAD);
         acc.setName(name);
         acc.setType(AccountType.BANK);
         try {

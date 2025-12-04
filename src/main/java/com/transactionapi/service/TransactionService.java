@@ -1,10 +1,12 @@
 package com.transactionapi.service;
 
+import com.transactionapi.constants.TransactionType;
 import com.transactionapi.dto.CreateTransactionRequest;
 import com.transactionapi.dto.TransactionResponse;
 import com.transactionapi.model.Account;
 import com.transactionapi.model.Transaction;
 import com.transactionapi.repository.TransactionRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -33,12 +35,8 @@ public class TransactionService {
         Transaction transaction = new Transaction();
         transaction.setAccount(account);
         transaction.setType(request.type());
-        transaction.setAmount(request.amount());
-        if (request.currency() != null) {
-            transaction.setCurrency(request.currency());
-        } else {
-            transaction.setCurrency(account.getCurrency());
-        }
+        transaction.setAmount(normalizeAmountForType(request.type(), request.amount(), false));
+        transaction.setCurrency(request.currency() != null ? request.currency() : account.getCurrency());
         transaction.setTicker(request.ticker());
         transaction.setName(request.name());
         transaction.setExchange(request.exchange());
@@ -47,7 +45,6 @@ public class TransactionService {
         transaction.setOptionType(request.optionType());
         transaction.setStrikePrice(request.strikePrice());
         transaction.setExpiryDate(request.expiryDate());
-        transaction.setUnderlyingTicker(request.underlyingTicker());
         transaction.setFee(request.fee());
         transaction.setOccurredAt(request.occurredAt());
         transaction.setNotes(request.notes());
@@ -63,6 +60,31 @@ public class TransactionService {
         }
 
         Transaction saved = transactionRepository.save(transaction);
+
+        if (request.type() == TransactionType.TRANSFER && request.targetAccountId() != null) {
+            Account target = accountService.loadOwnedAccount(request.targetAccountId(), userId);
+            Transaction mirror = new Transaction();
+            mirror.setAccount(target);
+            mirror.setType(TransactionType.TRANSFER);
+            mirror.setAmount(normalizeAmountForType(TransactionType.TRANSFER, request.amount(), true));
+            mirror.setCurrency(target.getCurrency());
+            mirror.setTicker(request.ticker());
+            mirror.setName(request.name());
+            mirror.setExchange(request.exchange());
+            mirror.setQuantity(request.quantity());
+            mirror.setPrice(request.price());
+            mirror.setOptionType(request.optionType());
+            mirror.setStrikePrice(request.strikePrice());
+            mirror.setExpiryDate(request.expiryDate());
+            mirror.setFee(request.fee());
+            mirror.setOccurredAt(request.occurredAt());
+            mirror.setNotes(request.notes());
+            mirror.setRelatedTransaction(transaction);
+            Transaction savedMirror = transactionRepository.save(mirror);
+            saved.setRelatedTransaction(savedMirror);
+            transactionRepository.save(saved);
+        }
+
         return toResponse(saved);
     }
 
@@ -91,7 +113,6 @@ public class TransactionService {
                 transaction.getOptionType(),
                 transaction.getStrikePrice(),
                 transaction.getExpiryDate(),
-                transaction.getUnderlyingTicker(),
                 transaction.getFee(),
                 relatedId,
                 transaction.getOccurredAt(),
@@ -99,5 +120,27 @@ public class TransactionService {
                 transaction.getCreatedAt(),
                 transaction.getUpdatedAt()
         );
+    }
+
+    private BigDecimal normalizeAmountForType(TransactionType type, BigDecimal amount, boolean incomingTransfer) {
+        if (amount == null) {
+            return null;
+        }
+        // Use provided sign if client sends negative; otherwise set sign based on type and direction.
+        if (amount.signum() == 0) {
+            return amount;
+        }
+        boolean shouldBeNegative = switch (type) {
+            case BUY, WITHDRAWAL, FEE, ASSIGNMENT, EXERCISE -> true;
+            case TRANSFER -> !incomingTransfer;
+            default -> false;
+        };
+        if (shouldBeNegative && amount.signum() > 0) {
+            return amount.negate();
+        }
+        if (!shouldBeNegative && amount.signum() < 0) {
+            return amount.negate();
+        }
+        return amount;
     }
 }

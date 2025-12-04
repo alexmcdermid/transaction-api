@@ -1,5 +1,7 @@
 package com.transactionapi.model;
 
+import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.Exchange;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import jakarta.persistence.Column;
@@ -48,11 +50,13 @@ public class Transaction {
     @Column(length = 255)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 3)
-    private String currency = "CAD";
+    private Currency currency = Currency.CAD;
 
+    @Enumerated(EnumType.STRING)
     @Column(length = 20)
-    private String exchange;
+    private Exchange exchange;
 
     private Integer quantity;
 
@@ -68,9 +72,6 @@ public class Transaction {
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
-
-    @Column(name = "underlying_ticker", length = 4)
-    private String underlyingTicker;
 
     @Column(precision = 18, scale = 2)
     private BigDecimal fee;
@@ -151,19 +152,19 @@ public class Transaction {
         this.name = name;
     }
 
-    public String getCurrency() {
+    public Currency getCurrency() {
         return currency;
     }
 
-    public void setCurrency(String currency) {
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
-    public String getExchange() {
+    public Exchange getExchange() {
         return exchange;
     }
 
-    public void setExchange(String exchange) {
+    public void setExchange(Exchange exchange) {
         this.exchange = exchange;
     }
 
@@ -213,14 +214,6 @@ public class Transaction {
 
     public void setExpiryDate(LocalDate expiryDate) {
         this.expiryDate = expiryDate;
-    }
-
-    public String getUnderlyingTicker() {
-        return underlyingTicker;
-    }
-
-    public void setUnderlyingTicker(String underlyingTicker) {
-        this.underlyingTicker = underlyingTicker;
     }
 
     public Transaction getRelatedTransaction() {

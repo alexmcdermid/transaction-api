@@ -1,7 +1,9 @@
 package com.transactionapi.dto;
 
-import com.transactionapi.constants.TransactionType;
+import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.Exchange;
 import com.transactionapi.constants.OptionType;
+import com.transactionapi.constants.TransactionType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -16,25 +18,33 @@ public record CreateTransactionRequest(
         @NotNull BigDecimal amount,
         @Size(max = 4) String ticker,
         @Size(max = 255) String name,
-        @Size(min = 3, max = 3) String currency,
-        @Size(max = 20) String exchange,
+        Currency currency,
+        Exchange exchange,
         @Positive Integer quantity,
         BigDecimal price,
         OptionType optionType,
         BigDecimal strikePrice,
         LocalDate expiryDate,
-        @Size(max = 4) String underlyingTicker,
         BigDecimal fee,
         UUID relatedTransactionId,
+        UUID targetAccountId,
         Instant occurredAt,
         String notes
 ) {
 
-    @AssertTrue(message = "strikePrice, expiryDate, and underlyingTicker are required when optionType is set")
+    @AssertTrue(message = "strikePrice is required when optionType is set")
     public boolean isOptionFieldsValid() {
         if (optionType == null) {
             return true;
         }
-        return strikePrice != null && expiryDate != null && underlyingTicker != null;
+        return strikePrice != null;
+    }
+
+    @AssertTrue(message = "targetAccountId is required for TRANSFER")
+    public boolean isTransferFieldsValid() {
+        if (type != TransactionType.TRANSFER) {
+            return true;
+        }
+        return targetAccountId != null;
     }
 }

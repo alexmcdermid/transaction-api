@@ -2,6 +2,7 @@ package com.transactionapi.model;
 
 import com.transactionapi.constants.AccountStatus;
 import com.transactionapi.constants.AccountType;
+import com.transactionapi.constants.Currency;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,8 +40,9 @@ public class Account {
     @Column(nullable = false, length = 20)
     private AccountType type;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 3)
-    private String currency = "CAD";
+    private Currency currency = Currency.CAD;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -101,11 +103,11 @@ public class Account {
         this.type = type;
     }
 
-    public String getCurrency() {
+    public Currency getCurrency() {
         return currency;
     }
 
-    public void setCurrency(String currency) {
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
