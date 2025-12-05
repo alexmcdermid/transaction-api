@@ -95,6 +95,20 @@ public class TransactionService {
                 .collect(Collectors.toList());
     }
 
+    public void deleteTransaction(UUID accountId, UUID transactionId, String userId) {
+        Account account = accountService.loadOwnedAccount(Objects.requireNonNull(accountId), userId);
+        Transaction tx = transactionRepository.findById(Objects.requireNonNull(transactionId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+        if (!tx.getAccount().getId().equals(account.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found");
+        }
+        Transaction related = tx.getRelatedTransaction();
+        transactionRepository.delete(tx);
+        if (related != null) {
+            transactionRepository.delete(related);
+        }
+    }
+
     private TransactionResponse toResponse(Transaction transaction) {
         UUID relatedId = transaction.getRelatedTransaction() != null
                 ? transaction.getRelatedTransaction().getId()
@@ -126,21 +140,15 @@ public class TransactionService {
         if (amount == null) {
             return null;
         }
-        // Use provided sign if client sends negative; otherwise set sign based on type and direction.
-        if (amount.signum() == 0) {
-            return amount;
+        BigDecimal abs = amount.abs();
+        if (abs.signum() == 0) {
+            return abs;
         }
         boolean shouldBeNegative = switch (type) {
-            case BUY, WITHDRAWAL, FEE, ASSIGNMENT, EXERCISE -> true;
+            case BUY, WITHDRAWAL, FEE -> true;
             case TRANSFER -> !incomingTransfer;
             default -> false;
         };
-        if (shouldBeNegative && amount.signum() > 0) {
-            return amount.negate();
-        }
-        if (!shouldBeNegative && amount.signum() < 0) {
-            return amount.negate();
-        }
-        return amount;
+        return shouldBeNegative ? abs.negate() : abs;
     }
 }

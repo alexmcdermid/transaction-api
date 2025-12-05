@@ -7,8 +7,8 @@ public enum TransactionType {
     BUY,
     SELL,
     FEE,
-    DIVIDEND,
-    ASSIGNMENT,
-    EXERCISE,
-    EXPIRATION
+    // DIVIDEND,
+    // ASSIGNMENT,
+    // EXERCISE,
+    // EXPIRATION
 }

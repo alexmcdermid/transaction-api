@@ -195,6 +195,45 @@ class TransactionServiceTest {
         Assertions.assertNotNull(response.id());
     }
 
+    @Test
+    void withdrawalNormalizesAmountToNegative() throws Exception {
+        Account account = account(UUID.randomUUID(), "user-1");
+        when(accountService.loadOwnedAccount(account.getId(), "user-1")).thenReturn(account);
+
+        ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction tx = invocation.getArgument(0, Transaction.class);
+            setTransactionId(tx, UUID.randomUUID());
+            tx.setOccurredAt(Instant.now());
+            return tx;
+        });
+
+        CreateTransactionRequest request = new CreateTransactionRequest(
+                TransactionType.WITHDRAWAL,
+                new BigDecimal("250"),
+                null,
+                null,
+                Currency.CAD,
+                Exchange.TSX,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                Instant.now(),
+                null
+        );
+
+        transactionService.createTransaction(account.getId(), request, "user-1");
+
+        verify(transactionRepository, times(1)).save(txCaptor.capture());
+        Transaction saved = txCaptor.getValue();
+        assertThat(saved.getAmount()).isEqualByComparingTo("-250");
+    }
+
     @NonNull
     private Account account(UUID id, String userId) {
         Account account = new Account();

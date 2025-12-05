@@ -5,6 +5,7 @@ import com.transactionapi.constants.Exchange;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TransactionType;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.AssertTrue;
@@ -15,17 +16,17 @@ import java.util.UUID;
 
 public record CreateTransactionRequest(
         @NotNull TransactionType type,
-        @NotNull BigDecimal amount,
+        @NotNull @PositiveOrZero BigDecimal amount,
         @Size(max = 4) String ticker,
         @Size(max = 255) String name,
         Currency currency,
         Exchange exchange,
         @Positive Integer quantity,
-        BigDecimal price,
+        @PositiveOrZero BigDecimal price,
         OptionType optionType,
-        BigDecimal strikePrice,
+        @PositiveOrZero BigDecimal strikePrice,
         LocalDate expiryDate,
-        BigDecimal fee,
+        @PositiveOrZero BigDecimal fee,
         UUID relatedTransactionId,
         UUID targetAccountId,
         Instant occurredAt,

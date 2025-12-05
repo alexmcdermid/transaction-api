@@ -9,6 +9,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -31,8 +32,11 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:}")
     private String[] allowedOrigins;
 
-    public SecurityConfig(HeaderUserAuthenticationFilter headerUserAuthenticationFilter) {
+    private final JwtDecoder jwtDecoder;
+
+    public SecurityConfig(HeaderUserAuthenticationFilter headerUserAuthenticationFilter, JwtDecoder jwtDecoder) {
         this.headerUserAuthenticationFilter = headerUserAuthenticationFilter;
+        this.jwtDecoder = jwtDecoder;
     }
 
     @Bean
@@ -48,7 +52,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
         );
         if (jwtEnabled) {
-            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)));
         }
         http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
