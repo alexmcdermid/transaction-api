@@ -1,6 +1,6 @@
 # Transaction API (Spring Boot)
 
-A minimal Spring Boot 3 / Java 21 service for recording financial transactions across user accounts. Authentication is intentionally stubbed for now (use the `X-User-Id` header to simulate the caller). Flyway manages the PostgreSQL schema.
+Simple trade-tracking backend (Spring Boot 3 / Java 21). It only cares about trades and realized P/L; there are no accounts or cash flows. Authentication is intentionally light for now (use the `X-User-Id` header to identify the caller). Flyway manages the PostgreSQL schema.
 
 ## Running locally
 
@@ -22,32 +22,26 @@ A minimal Spring Boot 3 / Java 21 service for recording financial transactions a
    mvn -B spring-boot:run
    ```
 
-## API (early scaffold)
+## API
 
-- `POST /api/v1/accounts` — create an account for the caller (`X-User-Id` header required).
-- `GET /api/v1/accounts` — list caller accounts.
-- `GET /api/v1/accounts/{id}` — fetch an account (only if owned by caller).
-- `POST /api/v1/accounts/{id}/transactions` — create a transaction on the account.
-- `GET /api/v1/accounts/{id}/transactions` — list transactions on the account.
 - `GET /api/v1/health` — basic health check.
+- `GET /api/v1/trades` — list trades for the caller.
+- `POST /api/v1/trades` — create a trade (stocks or options, long or short).
+- `PUT /api/v1/trades/{id}` — update a trade (must belong to caller).
+- `DELETE /api/v1/trades/{id}` — remove a trade.
+- `GET /api/v1/trades/summary` — realized P/L totals with daily and monthly buckets.
 
-Transactions support richer trade fields (`ticker`, `name`, `currency`, `exchange`, `quantity`, `price`, option details, `fee`) and linkage via `relatedTransactionId` for transfers. When `optionType` is provided, `strikePrice`, `expiryDate`, and `underlyingTicker` are required; transaction types also cover option lifecycle events (e.g., exercises, expirations).
+Trade fields are intentionally minimal: symbol, asset type (stock/option), direction (long/short), quantity, entry/exit prices, fees, open/close dates, notes, and option-specific details (type/strike/expiry). Realized P/L is calculated server-side on create/update.
 
 ## Authentication scaffolding
 
 - Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal. You can set a dev user via `app.security.dev-user-id` to avoid passing the header locally.
-- JWT (preferred for real deployments): set `app.security.jwt.enabled=true` and provide either `JWT_ISSUER_URI` or `JWT_JWKS_URI` env vars. Spring Security will validate bearer tokens and use the JWT `sub` (or `email`) as the caller id. Works with providers like AWS Cognito, Firebase, Auth0, etc. By default those properties are unset to avoid auto-config errors locally.
+- JWT (preferred for real deployments): set `app.security.jwt.enabled=true` and provide either `JWT_ISSUER_URI` or `JWT_JWKS_URI` env vars. Spring Security will validate bearer tokens and use the JWT `sub` (or `email`) as the caller id. By default those properties are unset to avoid auto-config errors locally.
 - Health endpoint is open; all other endpoints require authentication.
-
-## Code layout
-
-- `model/` holds JPA entities.
-- `constants/` holds enums.
-- `dto/`, `service/`, `repository/`, `controller/`, `security/` are named as expected.
 
 ## Database migrations
 
-Flyway runs migrations from `src/main/resources/db/migration`. Initial DDL lives in `V1__create_accounts_and_transactions.sql`. JPA is set to `validate` to keep entities and DDL in sync.
+Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` creates the single `trades` table used by the app.
 
 ## CI/CD (GitHub Actions)
 

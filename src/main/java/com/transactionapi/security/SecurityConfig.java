@@ -1,6 +1,7 @@
 package com.transactionapi.security;
 
 import com.transactionapi.constants.ApiPaths;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,11 +33,11 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:}")
     private String[] allowedOrigins;
 
-    private final JwtDecoder jwtDecoder;
+    private final ObjectProvider<JwtDecoder> jwtDecoderProvider;
 
-    public SecurityConfig(HeaderUserAuthenticationFilter headerUserAuthenticationFilter, JwtDecoder jwtDecoder) {
+    public SecurityConfig(HeaderUserAuthenticationFilter headerUserAuthenticationFilter, ObjectProvider<JwtDecoder> jwtDecoderProvider) {
         this.headerUserAuthenticationFilter = headerUserAuthenticationFilter;
-        this.jwtDecoder = jwtDecoder;
+        this.jwtDecoderProvider = jwtDecoderProvider;
     }
 
     @Bean
@@ -52,7 +53,10 @@ public class SecurityConfig {
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
         );
         if (jwtEnabled) {
-            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)));
+            JwtDecoder decoder = jwtDecoderProvider.getIfAvailable(() -> {
+                throw new IllegalStateException("JWT enabled but no JwtDecoder configured");
+            });
+            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)));
         }
         http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
