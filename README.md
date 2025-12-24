@@ -46,3 +46,7 @@ Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` 
 ## CI/CD (GitHub Actions)
 
 A starter workflow in `.github/workflows/ci.yml` builds and tests with Maven. It also contains a stubbed Docker/ECR deploy job for ECS—fill in AWS details and secrets before enabling.
+
+## Frontend
+
+The companion frontend lives at https://github.com/alexmcdermid/tradingView.
