@@ -26,6 +26,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final HeaderUserAuthenticationFilter headerUserAuthenticationFilter;
+    private final RateLimitingFilter rateLimitingFilter;
 
     @Value("${app.security.jwt.enabled:false}")
     private boolean jwtEnabled;
@@ -35,8 +36,13 @@ public class SecurityConfig {
 
     private final ObjectProvider<JwtDecoder> jwtDecoderProvider;
 
-    public SecurityConfig(HeaderUserAuthenticationFilter headerUserAuthenticationFilter, ObjectProvider<JwtDecoder> jwtDecoderProvider) {
+    public SecurityConfig(
+            HeaderUserAuthenticationFilter headerUserAuthenticationFilter,
+            RateLimitingFilter rateLimitingFilter,
+            ObjectProvider<JwtDecoder> jwtDecoderProvider
+    ) {
         this.headerUserAuthenticationFilter = headerUserAuthenticationFilter;
+        this.rateLimitingFilter = rateLimitingFilter;
         this.jwtDecoderProvider = jwtDecoderProvider;
     }
 
@@ -59,6 +65,7 @@ public class SecurityConfig {
             http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)));
         }
         http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(rateLimitingFilter, HeaderUserAuthenticationFilter.class);
         return http.build();
     }
 
