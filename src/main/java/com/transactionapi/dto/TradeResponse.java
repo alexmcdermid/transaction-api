@@ -1,6 +1,7 @@
 package com.transactionapi.dto;
 
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
 import java.math.BigDecimal;
@@ -12,6 +13,7 @@ public record TradeResponse(
         UUID id,
         String symbol,
         AssetType assetType,
+        Currency currency,
         TradeDirection direction,
         int quantity,
         BigDecimal entryPrice,

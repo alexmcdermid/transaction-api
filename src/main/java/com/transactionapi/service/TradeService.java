@@ -1,6 +1,8 @@
 package com.transactionapi.service;
 
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
@@ -14,6 +16,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,6 +36,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class TradeService {
 
     private static final BigDecimal OPTION_MULTIPLIER = BigDecimal.valueOf(100);
+    private static final Map<Currency, BigDecimal> CURRENCY_TO_USD = new EnumMap<>(Currency.class);
+
+    static {
+        CURRENCY_TO_USD.put(Currency.USD, BigDecimal.ONE);
+        CURRENCY_TO_USD.put(Currency.CAD, new BigDecimal("0.732"));
+    }
 
     private final TradeRepository tradeRepository;
 
@@ -129,6 +138,7 @@ public class TradeService {
 
         trade.setSymbol(request.symbol().trim().toUpperCase());
         trade.setAssetType(request.assetType());
+        trade.setCurrency(request.currency() != null ? request.currency() : Currency.USD);
         trade.setDirection(request.direction());
         trade.setQuantity(request.quantity());
         trade.setEntryPrice(request.entryPrice());
@@ -162,10 +172,16 @@ public class TradeService {
 
     private BigDecimal sumPnl(List<Trade> trades) {
         return trades.stream()
-                .map(Trade::getRealizedPnl)
+                .map(this::toUsd)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal toUsd(Trade trade) {
+        Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
+        BigDecimal rate = CURRENCY_TO_USD.getOrDefault(currency, BigDecimal.ONE);
+        return trade.getRealizedPnl().multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     private TradeResponse toResponse(Trade trade) {
@@ -173,6 +189,7 @@ public class TradeService {
                 trade.getId(),
                 trade.getSymbol(),
                 trade.getAssetType(),
+                trade.getCurrency(),
                 trade.getDirection(),
                 trade.getQuantity(),
                 trade.getEntryPrice(),

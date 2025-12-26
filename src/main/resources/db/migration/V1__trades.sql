@@ -2,6 +2,7 @@ CREATE TABLE trades (
     id UUID PRIMARY KEY,
     user_id VARCHAR(128) NOT NULL,
     symbol VARCHAR(12) NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     asset_type VARCHAR(10) NOT NULL,
     direction VARCHAR(10) NOT NULL,
     quantity INTEGER NOT NULL,

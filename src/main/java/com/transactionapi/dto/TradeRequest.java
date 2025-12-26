@@ -1,6 +1,7 @@
 package com.transactionapi.dto;
 
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
 import jakarta.validation.constraints.DecimalMin;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 public record TradeRequest(
         @NotBlank @Size(max = 12) String symbol,
         @NotNull AssetType assetType,
+        @NotNull Currency currency,
         @NotNull TradeDirection direction,
         @NotNull @Positive Integer quantity,
         @NotNull @DecimalMin("0.00") BigDecimal entryPrice,

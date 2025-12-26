@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.PagedResponse;
@@ -44,6 +45,7 @@ class TradeServiceTest {
         TradeRequest request = new TradeRequest(
                 "AAPL",
                 AssetType.OPTION,
+                Currency.USD,
                 TradeDirection.SHORT,
                 2,
                 new BigDecimal("3.10"),
@@ -67,6 +69,7 @@ class TradeServiceTest {
         TradeRequest incomplete = new TradeRequest(
                 "QQQ",
                 AssetType.OPTION,
+                Currency.USD,
                 TradeDirection.LONG,
                 1,
                 new BigDecimal("2.00"),
@@ -93,6 +96,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "MSFT",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         10,
                         new BigDecimal("10.00"),
@@ -113,6 +117,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "AMD",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.SHORT,
                         5,
                         new BigDecimal("50.00"),
@@ -133,6 +138,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "SPY",
                         AssetType.OPTION,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1.50"),
@@ -170,6 +176,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "AAA",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -188,6 +195,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "BBB",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -206,6 +214,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "CCC",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -240,6 +249,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "JAN",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -258,6 +268,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "MAY-1",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -276,6 +287,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "MAY-2",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.SHORT,
                         1,
                         new BigDecimal("2"),
@@ -304,6 +316,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "JAN",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.LONG,
                         1,
                         new BigDecimal("1"),
@@ -322,6 +335,7 @@ class TradeServiceTest {
                 new TradeRequest(
                         "FEB",
                         AssetType.STOCK,
+                        Currency.USD,
                         TradeDirection.SHORT,
                         1,
                         new BigDecimal("5"),

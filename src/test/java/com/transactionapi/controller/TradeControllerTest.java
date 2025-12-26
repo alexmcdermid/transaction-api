@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.TradeRequest;
 import java.math.BigDecimal;
@@ -38,6 +39,7 @@ class TradeControllerTest {
         TradeRequest mayTrade = new TradeRequest(
                 "TSLA",
                 AssetType.STOCK,
+                Currency.USD,
                 TradeDirection.LONG,
                 3,
                 new BigDecimal("100.00"),
@@ -53,6 +55,7 @@ class TradeControllerTest {
         TradeRequest juneTrade = new TradeRequest(
                 "AAPL",
                 AssetType.STOCK,
+                Currency.USD,
                 TradeDirection.SHORT,
                 1,
                 new BigDecimal("20.00"),

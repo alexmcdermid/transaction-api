@@ -1,6 +1,7 @@
 package com.transactionapi.model;
 
 import com.transactionapi.constants.AssetType;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
 import jakarta.persistence.Column;
@@ -38,6 +39,10 @@ public class Trade {
     @Enumerated(EnumType.STRING)
     @Column(name = "asset_type", nullable = false, length = 10)
     private AssetType assetType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency", nullable = false, length = 3)
+    private Currency currency = Currency.USD;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
@@ -122,6 +127,14 @@ public class Trade {
 
     public void setAssetType(AssetType assetType) {
         this.assetType = assetType;
+    }
+
+    public Currency getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(Currency currency) {
+        this.currency = currency;
     }
 
     public TradeDirection getDirection() {
