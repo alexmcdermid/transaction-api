@@ -3,6 +3,7 @@ package com.transactionapi.service;
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.PnlBucketResponse;
+import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
@@ -12,11 +13,15 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -49,10 +54,33 @@ public class TradeService {
         return toResponse(tradeRepository.save(trade));
     }
 
-    public List<TradeResponse> listTrades(String userId) {
-        return tradeRepository.findAllForUser(userId).stream()
+    public PagedResponse<TradeResponse> listTrades(String userId, int page, int size) {
+        return listTrades(userId, page, size, null);
+    }
+
+    public PagedResponse<TradeResponse> listTrades(String userId, int page, int size, YearMonth month) {
+        int boundedSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), boundedSize);
+        Page<Trade> result;
+        if (month != null) {
+            LocalDate start = month.atDay(1);
+            LocalDate end = month.atEndOfMonth();
+            result = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(userId, start, end, pageable);
+        } else {
+            result = tradeRepository.findByUserIdOrderByClosedAtDesc(userId, pageable);
+        }
+        List<TradeResponse> items = result.getContent().stream()
                 .map(this::toResponse)
                 .toList();
+        return new PagedResponse<>(
+                items,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext(),
+                result.hasPrevious()
+        );
     }
 
     public void deleteTrade(@NonNull UUID tradeId, String userId) {
@@ -61,8 +89,15 @@ public class TradeService {
         tradeRepository.delete(trade);
     }
 
-    public PnlSummaryResponse summarize(String userId) {
-        List<Trade> trades = tradeRepository.findAllForUser(userId);
+    public PnlSummaryResponse summarize(String userId, YearMonth month) {
+        List<Trade> trades;
+        if (month != null) {
+            LocalDate start = month.atDay(1);
+            LocalDate end = month.atEndOfMonth();
+            trades = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(userId, start, end);
+        } else {
+            trades = tradeRepository.findAllForUser(userId);
+        }
         BigDecimal total = sumPnl(trades);
 
         Map<LocalDate, List<Trade>> byDay = trades.stream()

@@ -35,7 +35,7 @@ class TradeControllerTest {
 
     @Test
     void createsListsAndSummarizesTrades() throws Exception {
-        TradeRequest request = new TradeRequest(
+        TradeRequest mayTrade = new TradeRequest(
                 "TSLA",
                 AssetType.STOCK,
                 TradeDirection.LONG,
@@ -50,31 +50,86 @@ class TradeControllerTest {
                 LocalDate.of(2024, 5, 10),
                 "test trade"
         );
+        TradeRequest juneTrade = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                TradeDirection.SHORT,
+                1,
+                new BigDecimal("20.00"),
+                new BigDecimal("10.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 6, 10),
+                LocalDate.of(2024, 6, 12),
+                "summer fade"
+        );
 
         mockMvc.perform(
                         post(ApiPaths.TRADES)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .header("X-User-Id", USER_ID)
-                                .content(objectMapper.writeValueAsString(request))
+                                .content(objectMapper.writeValueAsString(mayTrade))
                 )
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.symbol").value("TSLA"))
                 .andExpect(jsonPath("$.realizedPnl").value(32.5));
 
         mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", USER_ID)
+                                .content(objectMapper.writeValueAsString(juneTrade))
+                )
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.symbol").value("AAPL"));
+
+        mockMvc.perform(
                         get(ApiPaths.TRADES)
                                 .header("X-User-Id", USER_ID)
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].symbol").value("TSLA"));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].symbol").value("AAPL"));
 
         mockMvc.perform(
                         get(ApiPaths.TRADES + "/summary")
                                 .header("X-User-Id", USER_ID)
                 )
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(2))
+                .andExpect(jsonPath("$.totalPnl").value(42.5));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/summary")
+                                .param("month", "2024-05")
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeCount").value(1))
                 .andExpect(jsonPath("$.totalPnl").value(32.5));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("page", "0")
+                                .param("size", "1")
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("page", "0")
+                                .param("size", "5")
+                                .param("month", "2024-05")
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].symbol").value("TSLA"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 }
