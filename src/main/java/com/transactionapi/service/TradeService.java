@@ -2,7 +2,6 @@ package com.transactionapi.service;
 
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
-import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
@@ -15,8 +14,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,17 +33,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class TradeService {
 
     private static final BigDecimal OPTION_MULTIPLIER = BigDecimal.valueOf(100);
-    private static final Map<Currency, BigDecimal> CURRENCY_TO_USD = new EnumMap<>(Currency.class);
-
-    static {
-        CURRENCY_TO_USD.put(Currency.USD, BigDecimal.ONE);
-        CURRENCY_TO_USD.put(Currency.CAD, new BigDecimal("0.732"));
-    }
 
     private final TradeRepository tradeRepository;
+    private final ExchangeRateService exchangeRateService;
 
-    public TradeService(TradeRepository tradeRepository) {
+    public TradeService(TradeRepository tradeRepository, ExchangeRateService exchangeRateService) {
         this.tradeRepository = tradeRepository;
+        this.exchangeRateService = exchangeRateService;
     }
 
     public TradeResponse createTrade(TradeRequest request, String userId) {
@@ -123,7 +116,14 @@ public class TradeService {
                 .map(entry -> new PnlBucketResponse(entry.getKey().toString(), sumPnl(entry.getValue()), entry.getValue().size()))
                 .toList();
 
-        return new PnlSummaryResponse(total, trades.size(), daily, monthly);
+        return new PnlSummaryResponse(
+                total,
+                trades.size(),
+                daily,
+                monthly,
+                exchangeRateService.cadToUsd(),
+                exchangeRateService.lastUpdatedOn()
+        );
     }
 
     private void applyRequest(Trade trade, TradeRequest request) {
@@ -180,7 +180,7 @@ public class TradeService {
 
     private BigDecimal toUsd(Trade trade) {
         Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
-        BigDecimal rate = CURRENCY_TO_USD.getOrDefault(currency, BigDecimal.ONE);
+        BigDecimal rate = currency == Currency.CAD ? exchangeRateService.cadToUsd() : BigDecimal.ONE;
         return trade.getRealizedPnl().multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 

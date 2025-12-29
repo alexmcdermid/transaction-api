@@ -1,0 +1,161 @@
+package com.transactionapi.service;
+
+import jakarta.annotation.PostConstruct;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * Fetches CAD/USD once per startup and daily from the CBSA/BoC endpoint.
+ * Converts CAD-per-USD to USD-per-CAD and caches the value with a fallback.
+ */
+@Service
+public class ExchangeRateService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExchangeRateService.class);
+
+    private final RestTemplate restTemplate;
+    private final String endpoint;
+    private final BigDecimal fallbackRate;
+    private final AtomicReference<BigDecimal> cadToUsd = new AtomicReference<>();
+    private final AtomicReference<LocalDate> lastUpdated = new AtomicReference<>();
+
+    public ExchangeRateService(
+            RestTemplateBuilder builder,
+            @Value("${app.fx.cad-usd.url:https://bcd-api-dca-ipa.cbsa-asfc.cloud-nuage.canada.ca/exchange-rate-lambda/exchange-rates}") String endpoint,
+            @Value("${app.fx.cad-usd.fallback:0.732}") BigDecimal fallbackRate,
+            @Value("${app.fx.timeout-ms:2000}") int timeoutMs
+    ) {
+        this.endpoint = endpoint;
+        this.fallbackRate = fallbackRate.setScale(3, RoundingMode.HALF_UP);
+        this.restTemplate = builder
+                .requestFactory(() -> {
+                    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+                    factory.setConnectTimeout(timeoutMs);
+                    factory.setReadTimeout(timeoutMs);
+                    return factory;
+                })
+                .build();
+        this.cadToUsd.set(this.fallbackRate);
+        this.lastUpdated.set(LocalDate.now());
+    }
+
+    public BigDecimal cadToUsd() {
+        return cadToUsd.get();
+    }
+
+    public LocalDate lastUpdatedOn() {
+        LocalDate date = lastUpdated.get();
+        return date != null ? date : LocalDate.now();
+    }
+
+    @PostConstruct
+    public void init() {
+        log.info("Initializing CAD/USD rate with fallback {}", cadToUsd.get());
+        refreshDaily();
+    }
+
+    @Scheduled(cron = "0 30 2 * * *")
+    public void refreshDaily() {
+        try {
+            log.info("Refreshing CAD/USD rate from {}", endpoint);
+            Map<?, ?> response = restTemplate.getForObject(endpoint, Map.class);
+            RateQuote quote = extractUsdRate(response);
+            if (quote != null) {
+                cadToUsd.set(quote.rate());
+                lastUpdated.set(quote.date());
+                log.info("CAD/USD rate updated to {} on {}", quote.rate(), quote.date());
+            } else {
+                log.warn("CAD/USD response missing usable rate, keeping cached {}", cadToUsd.get());
+            }
+        } catch (Exception ex) {
+            log.warn("Unable to refresh CAD/USD rate, keeping cached value {}", cadToUsd.get(), ex);
+        }
+    }
+
+    private RateQuote extractUsdRate(Map<?, ?> response) {
+        if (response == null) {
+            return null;
+        }
+
+        Object fx = response.get("ForeignExchangeRates");
+        if (fx instanceof List<?> list) {
+            return extractUsdRateFromList(list);
+        }
+
+        return null;
+    }
+
+    private RateQuote extractUsdRateFromList(List<?> list) {
+        return list.stream()
+                .filter(item -> item instanceof Map<?, ?>)
+                .map(item -> (Map<?, ?>) item)
+                .filter(this::isUsdToCad)
+                .sorted(Comparator.comparing(this::effectiveTimestamp).reversed())
+                .map(this::toRateQuote)
+                .filter(quote -> quote != null && quote.rate().compareTo(BigDecimal.ZERO) > 0)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isUsdToCad(Map<?, ?> entry) {
+        Object from = extractCurrency(entry.get("FromCurrency"));
+        Object to = extractCurrency(entry.get("ToCurrency"));
+        return "USD".equalsIgnoreCase(String.valueOf(from)) && "CAD".equalsIgnoreCase(String.valueOf(to));
+    }
+
+    private Object extractCurrency(Object node) {
+        if (node instanceof Map<?, ?> map) {
+            Object val = map.get("Value");
+            if (val != null) {
+                return val;
+            }
+        }
+        return node;
+    }
+
+    private ZonedDateTime effectiveTimestamp(Map<?, ?> entry) {
+        Object ts = entry.get("ExchangeRateEffectiveTimestamp");
+        if (ts instanceof String s) {
+            try {
+                return ZonedDateTime.parse(s);
+            } catch (Exception ignored) {
+            }
+        }
+        return ZonedDateTime.now();
+    }
+
+    private RateQuote toRateQuote(Map<?, ?> entry) {
+        Object rateObj = entry.get("Rate");
+        BigDecimal cadPerUsd = null;
+        if (rateObj instanceof Number number) {
+            cadPerUsd = BigDecimal.valueOf(number.doubleValue());
+        } else if (rateObj instanceof String s) {
+            try {
+                cadPerUsd = new BigDecimal(s);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (cadPerUsd != null && cadPerUsd.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal usdPerCad = BigDecimal.ONE.divide(cadPerUsd, 6, RoundingMode.HALF_UP);
+            return new RateQuote(usdPerCad, LocalDate.now());
+        }
+        return null;
+    }
+
+    private record RateQuote(BigDecimal rate, LocalDate date) {
+    }
+}
