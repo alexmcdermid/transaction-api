@@ -152,8 +152,27 @@ jobs:
             --service "${ECS_SERVICE}" \
             --task-definition "${TASK_DEF_ARN}"
           
-          aws ecs wait services-stable \
-            --cluster "${ECS_CLUSTER}" \
-            --services "${ECS_SERVICE}" \
-            --max-attempts 120 \
-            --delay 15
+          for i in $(seq 1 120); do
+            rollout_state=$(aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}" \
+              --query 'services[0].deployments[?status==`PRIMARY`].rolloutState | [0]' \
+              --output text)
+            running_count=$(aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}" \
+              --query 'services[0].runningCount' \
+              --output text)
+            desired_count=$(aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}" \
+              --query 'services[0].desiredCount' \
+              --output text)
+            if [ "${rollout_state}" = "COMPLETED" ] && [ "${running_count}" = "${desired_count}" ]; then
+              echo "ECS service is stable."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for ECS service to stabilize." >&2
+          exit 1
