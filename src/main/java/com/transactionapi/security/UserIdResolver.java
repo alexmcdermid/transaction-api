@@ -24,19 +24,19 @@ public class UserIdResolver {
     @Value("${app.security.allowed-emails:}")
     private String allowedEmails;
 
+    @Value("${app.security.admin-emails:}")
+    private String adminEmails;
+
     private Set<String> allowedEmailSet = Collections.emptySet();
+    private Set<String> adminEmailSet = Collections.emptySet();
 
     @PostConstruct
     void init() {
-        if (!StringUtils.hasText(allowedEmails)) {
-            allowedEmailSet = Collections.emptySet();
-            return;
+        allowedEmailSet = parseEmails(allowedEmails);
+        adminEmailSet = parseEmails(adminEmails);
+        if (adminEmailSet.isEmpty()) {
+            adminEmailSet = allowedEmailSet;
         }
-        allowedEmailSet = Arrays.stream(allowedEmails.split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .map(String::toLowerCase)
-                .collect(Collectors.toSet());
     }
 
     public String requireUserId(Authentication authentication) {
@@ -61,23 +61,49 @@ public class UserIdResolver {
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User identity missing");
     }
 
+    public void requireAdmin(Authentication authentication) {
+        if (adminEmailSet.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+        String email = resolveEmail(authentication);
+        if (!StringUtils.hasText(email) || !adminEmailSet.contains(email.toLowerCase())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+    }
+
     private void enforceAllowedEmails(Authentication authentication) {
         if (allowedEmailSet.isEmpty()) {
             return;
         }
-        String email = null;
-        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
-            email = jwtAuth.getToken().getClaimAsString("email");
-        } else if (authentication != null && authentication.getPrincipal() instanceof String principal) {
-            if (principal.contains("@")) {
-                email = principal;
-            }
-        }
+        String email = resolveEmail(authentication);
         if (!StringUtils.hasText(email)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
         }
         if (!allowedEmailSet.contains(email.toLowerCase())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
         }
+    }
+
+    private String resolveEmail(Authentication authentication) {
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getClaimAsString("email");
+        }
+        if (authentication != null && authentication.getPrincipal() instanceof String principal) {
+            if (principal.contains("@")) {
+                return principal;
+            }
+        }
+        return null;
+    }
+
+    private Set<String> parseEmails(String emails) {
+        if (!StringUtils.hasText(emails)) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(emails.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
     }
 }

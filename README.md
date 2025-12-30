@@ -30,6 +30,7 @@ Simple trade-tracking backend (Spring Boot 3 / Java 21). It only cares about tra
 - `PUT /api/v1/trades/{id}` — update a trade (must belong to caller).
 - `DELETE /api/v1/trades/{id}` — remove a trade.
 - `GET /api/v1/trades/summary` — realized P/L totals with daily and monthly buckets.
+- `GET /api/v1/admin/users` — list users (admin only).
 
 Trade fields are intentionally minimal: symbol, asset type (stock/option), direction (long/short), quantity, entry/exit prices, fees, open/close dates, notes, and option-specific details (type/strike/expiry). Realized P/L is calculated server-side on create/update.
 
@@ -37,6 +38,7 @@ Trade fields are intentionally minimal: symbol, asset type (stock/option), direc
 
 - Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal. You can set a dev user via `app.security.dev-user-id` to avoid passing the header locally.
 - JWT (preferred for real deployments): set `app.security.jwt.enabled=true`, `app.security.jwt.issuer-uri=https://accounts.google.com`, and `app.security.jwt.audience=<Google client id>`. Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
+- Admin allowlist: set `app.security.admin-emails` (comma-separated). If unset, the admin list falls back to `app.security.allowed-emails`.
 - Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication.
 
 ## Database migrations
@@ -60,6 +62,7 @@ Required GitHub secrets (dev):
 - `DEV_DB_HOST`, `DEV_DB_PORT`, `DEV_DB_NAME`, `DEV_DB_USERNAME`, `DEV_DB_PASSWORD`
 - `DEV_CORS_ALLOWED_ORIGINS`
 - `DEV_ALLOWED_EMAILS`
+- `DEV_ADMIN_EMAILS` (optional)
 - `DEV_GOOGLE_CLIENT_ID`
 - `DEV_GOOGLE_JWK_SET` (optional)
 
@@ -75,6 +78,7 @@ Required GitHub secrets (prod):
 - `PROD_CORS_ALLOWED_ORIGINS`
 - `PROD_GOOGLE_CLIENT_ID`
 - `PROD_GOOGLE_JWK_SET` (optional)
+- `PROD_ADMIN_EMAILS` (optional)
 
 OIDC role permissions for ECS deploys must include:
 - `ecs:RegisterTaskDefinition`, `ecs:UpdateService`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`
