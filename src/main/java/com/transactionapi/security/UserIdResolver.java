@@ -84,7 +84,7 @@ public class UserIdResolver {
         }
     }
 
-    private String resolveEmail(Authentication authentication) {
+    public String resolveEmail(Authentication authentication) {
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             return jwtAuth.getToken().getClaimAsString("email");
         }

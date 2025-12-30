@@ -44,7 +44,7 @@ public class TradeController {
             @RequestParam(required = false) String month
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.listTrades(userId, 0, 100, parseMonth(month)).items();
     }
 
@@ -54,7 +54,7 @@ public class TradeController {
             @Valid @RequestBody TradeRequest request
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         TradeResponse response = tradeService.createTrade(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -67,7 +67,7 @@ public class TradeController {
             @RequestParam(required = false) String month
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.listTrades(userId, page, size, parseMonth(month));
     }
 
@@ -78,7 +78,7 @@ public class TradeController {
             @Valid @RequestBody TradeRequest request
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.updateTrade(tradeId, request, userId);
     }
 
@@ -88,7 +88,7 @@ public class TradeController {
             @PathVariable UUID tradeId
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         tradeService.deleteTrade(tradeId, userId);
         return ResponseEntity.noContent().build();
     }
@@ -99,7 +99,7 @@ public class TradeController {
             @RequestParam(required = false) String month
     ) {
         String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.summarize(userId, parseMonth(month));
     }
 

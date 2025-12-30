@@ -24,6 +24,9 @@ public class User {
     @Column(name = "auth_id", nullable = false, unique = true, length = 128)
     private String authId;
 
+    @Column(name = "email", length = 256)
+    private String email;
+
     @Column(name = "premium", nullable = false)
     private boolean premium = false;
 
@@ -55,6 +58,14 @@ public class User {
 
     public void setAuthId(String authId) {
         this.authId = authId;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public boolean isPremium() {

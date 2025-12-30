@@ -15,10 +15,19 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public void ensureUserExists(String authId) {
-        userRepository.findByAuthId(authId).orElseGet(() -> {
+    public void ensureUserExists(String authId, String email) {
+        userRepository.findByAuthId(authId).map(existing -> {
+            if (email != null && !email.isBlank() && !email.equalsIgnoreCase(existing.getEmail())) {
+                existing.setEmail(email);
+                return userRepository.save(existing);
+            }
+            return existing;
+        }).orElseGet(() -> {
             User user = new User();
             user.setAuthId(authId);
+            if (email != null && !email.isBlank()) {
+                user.setEmail(email);
+            }
             return userRepository.save(user);
         });
     }

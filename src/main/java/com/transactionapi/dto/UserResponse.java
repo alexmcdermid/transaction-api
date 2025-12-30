@@ -7,6 +7,7 @@ import java.util.UUID;
 public record UserResponse(
         UUID id,
         String authId,
+        String email,
         boolean premium,
         Instant createdAt,
         Instant updatedAt
@@ -15,6 +16,7 @@ public record UserResponse(
         return new UserResponse(
                 user.getId(),
                 user.getAuthId(),
+                user.getEmail(),
                 user.isPremium(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
