@@ -81,12 +81,13 @@ jobs:
           add_env("APP_SECURITY_JWT_ISSUER_URI", required("APP_SECURITY_JWT_ISSUER_URI"))
           add_env("APP_SECURITY_JWT_AUDIENCE", required("APP_SECURITY_JWT_AUDIENCE"))
           add_env("APP_SECURITY_JWT_JWK_SET", os.environ.get("APP_SECURITY_JWT_JWK_SET", ""), optional=True)
+          add_env("SERVER_PORT", "80")
           
           container = {
-              "name": "transaction-api",
+              "name": "Main",
               "image": required("IMAGE"),
               "essential": True,
-              "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
+              "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
               "environment": env_list,
           }
           

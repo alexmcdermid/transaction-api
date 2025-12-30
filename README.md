@@ -37,7 +37,7 @@ Trade fields are intentionally minimal: symbol, asset type (stock/option), direc
 
 - Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal. You can set a dev user via `app.security.dev-user-id` to avoid passing the header locally.
 - JWT (preferred for real deployments): set `app.security.jwt.enabled=true`, `app.security.jwt.issuer-uri=https://accounts.google.com`, and `app.security.jwt.audience=<Google client id>`. Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
-- Health endpoint is open; all other endpoints require authentication.
+- Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication.
 
 ## Database migrations
 

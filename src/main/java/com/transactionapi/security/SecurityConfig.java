@@ -52,7 +52,7 @@ public class SecurityConfig {
         http.cors(Customizer.withDefaults());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers(ApiPaths.HEALTH).permitAll()
+                .requestMatchers("/", ApiPaths.HEALTH).permitAll()
                 .anyRequest().authenticated()
         );
         http.exceptionHandling(ex -> ex
