@@ -129,4 +129,8 @@ jobs:
             --service "${ECS_SERVICE}" \
             --task-definition "${TASK_DEF_ARN}"
           
-          aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --max-attempts 120 \
+            --delay 15
