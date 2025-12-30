@@ -36,7 +36,7 @@ Trade fields are intentionally minimal: symbol, asset type (stock/option), direc
 ## Authentication scaffolding
 
 - Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal. You can set a dev user via `app.security.dev-user-id` to avoid passing the header locally.
-- JWT (preferred for real deployments): set `app.security.jwt.enabled=true` and provide either `JWT_ISSUER_URI` or `JWT_JWKS_URI` env vars. Spring Security will validate bearer tokens and use the JWT `sub` (or `email`) as the caller id. By default those properties are unset to avoid auto-config errors locally.
+- JWT (preferred for real deployments): set `app.security.jwt.enabled=true`, `app.security.jwt.issuer-uri=https://accounts.google.com`, and `app.security.jwt.audience=<Google client id>`. Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
 - Health endpoint is open; all other endpoints require authentication.
 
 ## Database migrations
@@ -48,21 +48,33 @@ Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` 
 CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`.
 
 Required GitHub secrets (dev):
-- `AWS_REGION` 
-- `AWS_ROLE_ARN` 
+- `AWS_REGION`
+- `AWS_ROLE_ARN`
 - `DEV_ECR_TRANSACTION_API_REPO`
-- `DEV_BACKEND_SERVICE_ARN`
+- `DEV_ECS_CLUSTER`
+- `DEV_ECS_SERVICE`
+- `DEV_ECS_TASK_FAMILY`
+- `DEV_ECS_EXECUTION_ROLE_ARN`
+- `DEV_ECS_TASK_ROLE_ARN` (optional)
+- `DEV_ECS_LOG_GROUP` (optional)
 - `DEV_DB_HOST`, `DEV_DB_PORT`, `DEV_DB_NAME`, `DEV_DB_USERNAME`, `DEV_DB_PASSWORD`
 - `DEV_CORS_ALLOWED_ORIGINS`
-- `DEV_ALLOWED_EMAILS` 
-- `DEV_GOOGLE_CLIENT_ID` 
+- `DEV_ALLOWED_EMAILS`
+- `DEV_GOOGLE_CLIENT_ID`
+- `DEV_GOOGLE_JWK_SET` (optional)
 
 Required GitHub secrets (prod):
 - `PROD_ECR_TRANSACTION_API_REPO`
-- `PROD_BACKEND_SERVICE_ARN`
+- `PROD_ECS_CLUSTER`
+- `PROD_ECS_SERVICE`
+- `PROD_ECS_TASK_FAMILY`
+- `PROD_ECS_EXECUTION_ROLE_ARN`
+- `PROD_ECS_TASK_ROLE_ARN` (optional)
+- `PROD_ECS_LOG_GROUP` (optional)
 - `PROD_DB_HOST`, `PROD_DB_PORT`, `PROD_DB_NAME`, `PROD_DB_USERNAME`, `PROD_DB_PASSWORD`
 - `PROD_CORS_ALLOWED_ORIGINS`
-- `PROD_GOOGLE_CLIENT_ID` 
+- `PROD_GOOGLE_CLIENT_ID`
+- `PROD_GOOGLE_JWK_SET` (optional)
 
 ## Frontend
 
