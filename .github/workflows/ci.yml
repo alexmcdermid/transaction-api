@@ -141,11 +141,10 @@ jobs:
           print(json.dumps(task_def))
           PY
           
-          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/task-def.json | python - <<'PY'
-          import json, sys
-          print(json.load(sys.stdin)["taskDefinition"]["taskDefinitionArn"])
-          PY
-          )
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
           
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \

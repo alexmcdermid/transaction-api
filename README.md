@@ -76,6 +76,10 @@ Required GitHub secrets (prod):
 - `PROD_GOOGLE_CLIENT_ID`
 - `PROD_GOOGLE_JWK_SET` (optional)
 
+OIDC role permissions for ECS deploys must include:
+- `ecs:RegisterTaskDefinition`, `ecs:UpdateService`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`
+- `iam:PassRole` for the execution role (and task role if used)
+
 ## Frontend
 
 The companion frontend lives at https://github.com/alexmcdermid/tradingView.
