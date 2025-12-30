@@ -45,7 +45,24 @@ Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` 
 
 ## CI/CD (GitHub Actions)
 
-A starter workflow in `.github/workflows/ci.yml` builds and tests with Maven. It also contains a stubbed Docker/ECR deploy job for ECS—fill in AWS details and secrets before enabling.
+CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`.
+
+Required GitHub secrets (dev):
+- `AWS_REGION` 
+- `AWS_ROLE_ARN` 
+- `DEV_ECR_TRANSACTION_API_REPO`
+- `DEV_BACKEND_SERVICE_ARN`
+- `DEV_DB_HOST`, `DEV_DB_PORT`, `DEV_DB_NAME`, `DEV_DB_USERNAME`, `DEV_DB_PASSWORD`
+- `DEV_CORS_ALLOWED_ORIGINS`
+- `DEV_ALLOWED_EMAILS` 
+- `DEV_GOOGLE_CLIENT_ID` 
+
+Required GitHub secrets (prod):
+- `PROD_ECR_TRANSACTION_API_REPO`
+- `PROD_BACKEND_SERVICE_ARN`
+- `PROD_DB_HOST`, `PROD_DB_PORT`, `PROD_DB_NAME`, `PROD_DB_USERNAME`, `PROD_DB_PASSWORD`
+- `PROD_CORS_ALLOWED_ORIGINS`
+- `PROD_GOOGLE_CLIENT_ID` 
 
 ## Frontend
 
