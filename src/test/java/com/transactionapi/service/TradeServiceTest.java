@@ -7,6 +7,7 @@ import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -360,5 +361,343 @@ class TradeServiceTest {
         assertThat(february.totalPnl()).isEqualByComparingTo("1.00");
         assertThat(february.daily()).extracting(bucket -> bucket.period())
                 .containsExactly("2024-02-10");
+    }
+
+    @Test
+    void aggregateStatsReturnsEmptyForNoTrades() {
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.totalPnl()).isEqualByComparingTo("0.00");
+        assertThat(stats.tradeCount()).isEqualTo(0);
+        assertThat(stats.bestDay()).isNull();
+        assertThat(stats.bestMonth()).isNull();
+    }
+
+    @Test
+    void aggregateStatsCalculatesTotalPnlAndCount() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("50.00"),
+                        new BigDecimal("55.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 15),
+                        LocalDate.of(2024, 2, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.totalPnl()).isEqualByComparingTo("125.00");
+        assertThat(stats.tradeCount()).isEqualTo(2);
+    }
+
+    @Test
+    void aggregateStatsConvertsCadToUsd() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "RY",
+                        AssetType.STOCK,
+                        Currency.CAD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 15),
+                        LocalDate.of(2024, 2, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.totalPnl()).isGreaterThan(new BigDecimal("170.00"));
+        assertThat(stats.totalPnl()).isLessThan(new BigDecimal("180.00"));
+        assertThat(stats.tradeCount()).isEqualTo(2);
+        assertThat(stats.cadToUsdRate()).isNotNull();
+    }
+
+    @Test
+    void aggregateStatsFindsBestDayAcrossAllTime() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 15),
+                        LocalDate.of(2024, 2, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T3",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("50.00"),
+                        new BigDecimal("55.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 20),
+                        LocalDate.of(2024, 3, 20),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.bestDay()).isNotNull();
+        assertThat(stats.bestDay().period()).isEqualTo("2024-02-15");
+        assertThat(stats.bestDay().pnl()).isEqualByComparingTo("100.00");
+        assertThat(stats.bestDay().trades()).isEqualTo(1);
+    }
+
+    @Test
+    void aggregateStatsFindsBestMonthAcrossAllTime() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2023, 1, 10),
+                        LocalDate.of(2023, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2023, 12, 10),
+                        LocalDate.of(2023, 12, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T3",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2023, 12, 15),
+                        LocalDate.of(2023, 12, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T4",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        15,
+                        new BigDecimal("50.00"),
+                        new BigDecimal("55.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 20),
+                        LocalDate.of(2024, 1, 20),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.bestMonth()).isNotNull();
+        assertThat(stats.bestMonth().period()).isEqualTo("2023-12");
+        assertThat(stats.bestMonth().pnl()).isEqualByComparingTo("200.00");
+        assertThat(stats.bestMonth().trades()).isEqualTo(2);
+    }
+
+    @Test
+    void aggregateStatsHandlesMultipleTradesOnSameDay() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 15),
+                        LocalDate.of(2024, 5, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("50.00"),
+                        new BigDecimal("60.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 15),
+                        LocalDate.of(2024, 5, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "T3",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("20.00"),
+                        new BigDecimal("25.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 15),
+                        LocalDate.of(2024, 5, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
+
+        assertThat(stats.bestDay()).isNotNull();
+        assertThat(stats.bestDay().period()).isEqualTo("2024-05-15");
+        assertThat(stats.bestDay().pnl()).isEqualByComparingTo("200.00");
+        assertThat(stats.bestDay().trades()).isEqualTo(3);
     }
 }

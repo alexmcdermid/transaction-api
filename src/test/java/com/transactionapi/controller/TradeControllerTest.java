@@ -135,4 +135,89 @@ class TradeControllerTest {
                 .andExpect(jsonPath("$.items[0].symbol").value("TSLA"))
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
+
+    @Test
+    void aggregateStatsReturnsStatsWithCurrencyConversion() throws Exception {
+        String testUserId = "stats-test-user";
+        TradeRequest usdTrade = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 10),
+                LocalDate.of(2024, 1, 10),
+                null
+        );
+
+        TradeRequest cadTrade = new TradeRequest(
+                "RY",
+                AssetType.STOCK,
+                Currency.CAD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 2, 15),
+                LocalDate.of(2024, 2, 15),
+                null
+        );
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", testUserId)
+                                .content(objectMapper.writeValueAsString(usdTrade))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", testUserId)
+                                .content(objectMapper.writeValueAsString(cadTrade))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats")
+                                .header("X-User-Id", testUserId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(2))
+                .andExpect(jsonPath("$.totalPnl").exists())
+                .andExpect(jsonPath("$.bestDay").exists())
+                .andExpect(jsonPath("$.bestDay.period").exists())
+                .andExpect(jsonPath("$.bestDay.pnl").exists())
+                .andExpect(jsonPath("$.bestDay.trades").exists())
+                .andExpect(jsonPath("$.bestMonth").exists())
+                .andExpect(jsonPath("$.bestMonth.period").exists())
+                .andExpect(jsonPath("$.bestMonth.pnl").exists())
+                .andExpect(jsonPath("$.bestMonth.trades").exists())
+                .andExpect(jsonPath("$.cadToUsdRate").exists())
+                .andExpect(jsonPath("$.fxDate").exists());
+    }
+
+    @Test
+    void aggregateStatsReturnsEmptyForNoTrades() throws Exception {
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats")
+                                .header("X-User-Id", "empty-user")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0))
+                .andExpect(jsonPath("$.bestDay").isEmpty())
+                .andExpect(jsonPath("$.bestMonth").isEmpty());
+    }
 }

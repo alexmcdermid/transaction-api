@@ -1,6 +1,7 @@
 package com.transactionapi.controller;
 
 import com.transactionapi.constants.ApiPaths;
+import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -101,6 +102,13 @@ public class TradeController {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.summarize(userId, parseMonth(month));
+    }
+
+    @GetMapping("/stats")
+    public AggregateStatsResponse stats(Authentication authentication) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getAggregateStats(userId);
     }
 
     private static java.time.YearMonth parseMonth(String value) {

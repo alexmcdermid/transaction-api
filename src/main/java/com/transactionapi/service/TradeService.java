@@ -3,6 +3,7 @@ package com.transactionapi.service;
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
@@ -122,6 +123,60 @@ public class TradeService {
                 daily,
                 monthly,
                 exchangeRateService.cadToUsd(),
+                exchangeRateService.lastUpdatedOn()
+        );
+    }
+
+    /**
+     * Get aggregated statistics efficiently using database queries.
+     * This is optimized for performance and doesn't load all trades into memory.
+     * All values are converted to USD using the current exchange rate.
+     */
+    public AggregateStatsResponse getAggregateStats(String userId) {
+        BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
+        
+        // Use database aggregation instead of loading all trades
+        int tradeCount = tradeRepository.countByUserId(userId);
+        BigDecimal totalPnl = tradeRepository.sumPnlByUserId(userId, cadToUsdRate);
+        if (totalPnl == null) {
+            totalPnl = BigDecimal.ZERO;
+        }
+        totalPnl = totalPnl.setScale(2, RoundingMode.HALF_UP);
+
+        // Get best day using database query (returns only top result)
+        TradeRepository.DailyAggregateProjection bestDayProj = tradeRepository.findBestDayByUserId(userId, cadToUsdRate);
+        PnlBucketResponse bestDay = null;
+        if (bestDayProj != null && bestDayProj.getPeriod() != null) {
+            BigDecimal pnl = bestDayProj.getPnl();
+            if (pnl != null) {
+                bestDay = new PnlBucketResponse(
+                        bestDayProj.getPeriod().toString(),
+                        pnl.setScale(2, RoundingMode.HALF_UP),
+                        bestDayProj.getTrades()
+                );
+            }
+        }
+
+        // Get best month using database query (returns only top result)
+        TradeRepository.MonthlyAggregateProjection monthProj = tradeRepository.findBestMonthByUserId(userId, cadToUsdRate);
+        PnlBucketResponse bestMonth = null;
+        if (monthProj != null && monthProj.getPeriod() != null) {
+            BigDecimal pnl = monthProj.getPnl();
+            if (pnl != null) {
+                bestMonth = new PnlBucketResponse(
+                        monthProj.getPeriod(),
+                        pnl.setScale(2, RoundingMode.HALF_UP),
+                        monthProj.getTrades()
+                );
+            }
+        }
+
+        return new AggregateStatsResponse(
+                totalPnl,
+                tradeCount,
+                bestDay,
+                bestMonth,
+                cadToUsdRate,
                 exchangeRateService.lastUpdatedOn()
         );
     }
