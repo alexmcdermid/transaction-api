@@ -5,7 +5,8 @@ Simple trade-tracking backend (Spring Boot 3 / Java 21). It only cares about tra
 ## Running locally
 
 1. Start PostgreSQL and set environment variables (defaults in `application.properties`):
-   - `DATABASE_URL` `jdbc:postgresql://...`
+   - `DATABASE_URL` (JDBC URL; put credentials in query params, not `user:pass@host`)
+     - Example: `jdbc:postgresql://<host>/<db>?user=<user>&password=<url-encoded>&sslmode=require&channel_binding=require`
 2. Use `application-local.properties` for local overrides (profile `local`), and `application.properties` for shared defaults. Example local file:
    ```
    spring.datasource.url=jdbc:postgresql://localhost:5432/transactions
@@ -40,6 +41,21 @@ Trade fields are intentionally minimal: symbol, asset type (stock/option), direc
 
 Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` creates the single `trades` table used by the app.
 
+## App Runner runtime config
+
+Required environment variables:
+- `DATABASE_URL` (JDBC URL; credentials in query params)
+- `APP_CORS_ALLOWED_ORIGINS`
+- `APP_SECURITY_JWT_ENABLED=true`
+- `APP_SECURITY_ALLOW_HEADER_AUTH=false`
+- `APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com`
+- `APP_SECURITY_JWT_AUDIENCE=<Google client id>`
+
+Optional:
+- `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
+- `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
+- `APP_SECURITY_JWT_JWK_SET` (pin JWKS JSON)
+
 ## CI/CD (GitHub Actions)
 
 CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
@@ -51,7 +67,7 @@ Required GitHub secrets (dev):
 - `DEV_BACKEND_SERVICE_ARN` (App Runner service ARN)
 - `DEV_DATABASE_URL`
 - `DEV_CORS_ALLOWED_ORIGINS`
-- `DEV_ALLOWED_EMAILS`
+- `DEV_ALLOWED_EMAILS` (optional)
 - `DEV_ADMIN_EMAILS` (optional)
 - `DEV_GOOGLE_CLIENT_ID`
 - `DEV_GOOGLE_JWK_SET` (optional)
