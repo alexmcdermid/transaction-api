@@ -5,15 +5,10 @@ Simple trade-tracking backend (Spring Boot 3 / Java 21). It only cares about tra
 ## Running locally
 
 1. Start PostgreSQL and set environment variables (defaults in `application.properties`):
-   - `DB_HOST` (default `localhost`)
-   - `DB_PORT` (default `5432`)
-   - `DB_NAME` (default `transactions`)
-   - `DB_USERNAME` / `DB_PASSWORD`
+   - `DATABASE_URL` `jdbc:postgresql://...`
 2. Use `application-local.properties` for local overrides (profile `local`), and `application.properties` for shared defaults. Example local file:
    ```
    spring.datasource.url=jdbc:postgresql://localhost:5432/transactions
-   spring.datasource.username=postgres
-   spring.datasource.password=postgres
    app.security.dev-user-id=local-user
    ```
    Run with `SPRING_PROFILES_ACTIVE=local` to pick it up.
@@ -47,19 +42,14 @@ Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` 
 
 ## CI/CD (GitHub Actions)
 
-CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`.
+CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
 
 Required GitHub secrets (dev):
 - `AWS_REGION`
 - `AWS_ROLE_ARN`
 - `DEV_ECR_TRANSACTION_API_REPO`
-- `DEV_ECS_CLUSTER`
-- `DEV_ECS_SERVICE`
-- `DEV_ECS_TASK_FAMILY`
-- `DEV_ECS_EXECUTION_ROLE_ARN`
-- `DEV_ECS_TASK_ROLE_ARN` (optional)
-- `DEV_ECS_LOG_GROUP` (optional)
-- `DEV_DB_HOST`, `DEV_DB_PORT`, `DEV_DB_NAME`, `DEV_DB_USERNAME`, `DEV_DB_PASSWORD`
+- `DEV_BACKEND_SERVICE_ARN` (App Runner service ARN)
+- `DEV_DATABASE_URL`
 - `DEV_CORS_ALLOWED_ORIGINS`
 - `DEV_ALLOWED_EMAILS`
 - `DEV_ADMIN_EMAILS` (optional)
@@ -68,21 +58,15 @@ Required GitHub secrets (dev):
 
 Required GitHub secrets (prod):
 - `PROD_ECR_TRANSACTION_API_REPO`
-- `PROD_ECS_CLUSTER`
-- `PROD_ECS_SERVICE`
-- `PROD_ECS_TASK_FAMILY`
-- `PROD_ECS_EXECUTION_ROLE_ARN`
-- `PROD_ECS_TASK_ROLE_ARN` (optional)
-- `PROD_ECS_LOG_GROUP` (optional)
-- `PROD_DB_HOST`, `PROD_DB_PORT`, `PROD_DB_NAME`, `PROD_DB_USERNAME`, `PROD_DB_PASSWORD`
+- `PROD_BACKEND_SERVICE_ARN` (App Runner service ARN)
+- `PROD_DATABASE_URL`
 - `PROD_CORS_ALLOWED_ORIGINS`
 - `PROD_GOOGLE_CLIENT_ID`
 - `PROD_GOOGLE_JWK_SET` (optional)
 - `PROD_ADMIN_EMAILS` (optional)
 
-OIDC role permissions for ECS deploys must include:
-- `ecs:RegisterTaskDefinition`, `ecs:UpdateService`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`
-- `iam:PassRole` for the execution role (and task role if used)
+OIDC role permissions for App Runner deploys must include:
+- `apprunner:UpdateService`, `apprunner:DescribeService`
 
 ## Frontend
 
