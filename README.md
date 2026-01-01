@@ -1,89 +1,33 @@
-# Transaction API (Spring Boot)
+# Transaction API
 
-Simple trade-tracking backend (Spring Boot 3 / Java 21). It only cares about trades and realized P/L; there are no accounts or cash flows. Authentication is intentionally light for now (use the `X-User-Id` header to identify the caller). Flyway manages the PostgreSQL schema.
+REST API backend for a day trading journal. Track your stock and option trades, calculate realized P&L, and view performance statistics.
 
-## Running locally
+## What it does
 
-1. Start PostgreSQL and set environment variables (defaults in `application.properties`):
-   - `DATABASE_URL` (JDBC URL; put credentials in query params, not `user:pass@host`)
-     - Example: `jdbc:postgresql://<host>/<db>?user=<user>&password=<url-encoded>&sslmode=require&channel_binding=require`
-2. Use `application-local.properties` for local overrides (profile `local`), and `application.properties` for shared defaults. Example local file:
-   ```
-   spring.datasource.url=jdbc:postgresql://localhost:5432/transactions
-   app.security.dev-user-id=local-user
-   ```
-   Run with `SPRING_PROFILES_ACTIVE=local` to pick it up.
-3. Run migrations and start the app:
-   ```bash
-   mvn -B spring-boot:run
-   ```
+This API provides endpoints to:
+- **Log trades** - Record stock and option trades with entry/exit prices, quantities, and fees
+- **Calculate P&L** - Automatically compute realized profit and loss for each trade
+- **Track performance** - View daily and monthly P&L summaries with best day/month statistics
+- **Multi-currency support** - Handle USD and CAD trades with automatic FX conversion
+- **Share trades** - Generate shareable links for individual trades
 
-## API
+Trades are stored per-user in PostgreSQL. Authentication is handled via Google OAuth (JWT tokens). The API supports both long and short positions for stocks and options (calls/puts).
 
-- `GET /api/v1/health` — basic health check.
-- `GET /api/v1/trades` — list trades for the caller.
-- `POST /api/v1/trades` — create a trade (stocks or options, long or short).
-- `PUT /api/v1/trades/{id}` — update a trade (must belong to caller).
-- `DELETE /api/v1/trades/{id}` — remove a trade.
-- `GET /api/v1/trades/summary` — realized P/L totals with daily and monthly buckets.
-- `GET /api/v1/admin/users` — list users (admin only).
+## Key Features
 
-Trade fields are intentionally minimal: symbol, asset type (stock/option), direction (long/short), quantity, entry/exit prices, fees, open/close dates, notes, and option-specific details (type/strike/expiry). Realized P/L is calculated server-side on create/update.
+- **Aggregate Statistics** - Database-optimized queries for total P&L, trade counts, and best performing days/months across all time
+- **Monthly Calendar View** - Browse trades by month with daily P&L rollups
+- **Admin Panel** - View all users and their activity (admin-only)
+- **Currency Conversion** - Automatic CAD to USD conversion using live exchange rates
+- **Performance Indexed** - Optimized database indexes for fast aggregate queries on large trade datasets
 
-## Authentication scaffolding
+## Tech Stack
 
-- Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal. You can set a dev user via `app.security.dev-user-id` to avoid passing the header locally.
-- JWT (preferred for real deployments): set `app.security.jwt.enabled=true`, `app.security.jwt.issuer-uri=https://accounts.google.com`, and `app.security.jwt.audience=<Google client id>`. Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
-- Admin allowlist: set `app.security.admin-emails` (comma-separated). If unset, the admin list falls back to `app.security.allowed-emails`.
-- Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication.
+- Spring Boot 3 / Java 21
+- PostgreSQL with Flyway migrations
+- JWT authentication (Google OAuth)
+- Deployed on AWS App Runner
 
-## Database migrations
+## Development
 
-Flyway runs migrations from `src/main/resources/db/migration`. `V1__trades.sql` creates the single `trades` table used by the app.
-
-## App Runner runtime config
-
-Required environment variables:
-- `DATABASE_URL` (JDBC URL; credentials in query params)
-- `APP_CORS_ALLOWED_ORIGINS`
-- `APP_SECURITY_JWT_ENABLED=true`
-- `APP_SECURITY_ALLOW_HEADER_AUTH=false`
-- `APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com`
-- `APP_SECURITY_JWT_AUDIENCE=<Google client id>`
-
-Optional:
-- `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
-- `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
-- `APP_SECURITY_JWT_JWK_SET` (pin JWKS JSON)
-
-## CI/CD (GitHub Actions)
-
-CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
-
-Required GitHub secrets (dev):
-- `AWS_REGION`
-- `AWS_ROLE_ARN`
-- `DEV_ECR_TRANSACTION_API_REPO`
-- `DEV_BACKEND_SERVICE_ARN` (App Runner service ARN)
-- `DEV_DATABASE_URL`
-- `DEV_CORS_ALLOWED_ORIGINS`
-- `DEV_ALLOWED_EMAILS` (optional)
-- `DEV_ADMIN_EMAILS` (optional)
-- `DEV_GOOGLE_CLIENT_ID`
-- `DEV_GOOGLE_JWK_SET` (optional)
-
-Required GitHub secrets (prod):
-- `PROD_ECR_TRANSACTION_API_REPO`
-- `PROD_BACKEND_SERVICE_ARN` (App Runner service ARN)
-- `PROD_DATABASE_URL`
-- `PROD_CORS_ALLOWED_ORIGINS`
-- `PROD_GOOGLE_CLIENT_ID`
-- `PROD_GOOGLE_JWK_SET` (optional)
-- `PROD_ADMIN_EMAILS` (optional)
-
-OIDC role permissions for App Runner deploys must include:
-- `apprunner:UpdateService`, `apprunner:DescribeService`
-
-## Frontend
-
-The companion frontend lives at https://github.com/alexmcdermid/tradingView.
+See [DEV.md](DEV.md) for setup instructions, API documentation, and deployment details.
