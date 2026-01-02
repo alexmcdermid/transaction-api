@@ -2,6 +2,8 @@ package com.transactionapi.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -219,5 +221,94 @@ class TradeControllerTest {
                 .andExpect(jsonPath("$.totalPnl").value(0))
                 .andExpect(jsonPath("$.bestDay").isEmpty())
                 .andExpect(jsonPath("$.bestMonth").isEmpty());
+    }
+
+    @Test
+    void userCannotAccessAnotherUsersTrades() throws Exception {
+        String userA = "user-a";
+        String userB = "user-b";
+
+        TradeRequest trade = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 10),
+                LocalDate.of(2024, 1, 10),
+                null
+        );
+
+        String tradeId = mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", userA)
+                                .content(objectMapper.writeValueAsString(trade))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String id = objectMapper.readTree(tradeId).get("id").asText();
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES)
+                                .header("X-User-Id", userB)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .header("X-User-Id", userB)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/summary")
+                                .header("X-User-Id", userB)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats")
+                                .header("X-User-Id", userB)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/" + id)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", userB)
+                                .content(objectMapper.writeValueAsString(trade))
+                )
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+                        delete(ApiPaths.TRADES + "/" + id)
+                                .header("X-User-Id", userB)
+                )
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES)
+                                .header("X-User-Id", userA)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(id));
     }
 }
