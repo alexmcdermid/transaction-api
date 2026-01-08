@@ -10,6 +10,6 @@ public record CreateShareLinkRequest(
         @NotNull ShareType shareType,
         @NotBlank String data,
         boolean requiresAuth,
-        @Min(1) @Max(90) Long expiryDays
+        @Max(90) Long expiryDays
 ) {
 }

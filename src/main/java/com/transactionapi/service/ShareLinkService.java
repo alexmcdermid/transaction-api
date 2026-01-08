@@ -19,9 +19,9 @@ public class ShareLinkService {
     private static final int CODE_LENGTH = 8;
     private static final int MAX_CODE_GENERATION_ATTEMPTS = 10;
     private static final long MAX_EXPIRY_DAYS = 90;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final ShareLinkRepository shareLinkRepository;
-    private final SecureRandom random = new SecureRandom();
 
     public ShareLinkService(ShareLinkRepository shareLinkRepository) {
         this.shareLinkRepository = shareLinkRepository;
@@ -97,13 +97,16 @@ public class ShareLinkService {
                 return code;
             }
         }
-        throw new RuntimeException("Failed to generate unique share code after " + MAX_CODE_GENERATION_ATTEMPTS + " attempts");
+        throw new IllegalStateException(
+            "Failed to generate unique share code after " + MAX_CODE_GENERATION_ATTEMPTS + 
+            " attempts. Consider increasing MAX_CODE_GENERATION_ATTEMPTS or expanding CODE_CHARS if collisions are frequent."
+        );
     }
 
     private String generateCode() {
         StringBuilder code = new StringBuilder(CODE_LENGTH);
         for (int i = 0; i < CODE_LENGTH; i++) {
-            code.append(CODE_CHARS.charAt(random.nextInt(CODE_CHARS.length())));
+            code.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
         }
         return code.toString();
     }

@@ -66,7 +66,6 @@ public class ShareLink {
     @PreUpdate
     void onUpdate() {
         this.updatedAt = Instant.now();
-        this.accessCount += 1;
     }
 
     @NonNull
