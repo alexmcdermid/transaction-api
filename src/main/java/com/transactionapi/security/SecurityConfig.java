@@ -55,6 +55,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", ApiPaths.HEALTH).permitAll()
+                .requestMatchers(HttpMethod.GET, ApiPaths.SHARES + "/*").permitAll()
                 .anyRequest().authenticated()
         );
         http.exceptionHandling(ex -> ex
