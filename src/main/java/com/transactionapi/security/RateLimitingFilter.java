@@ -1,5 +1,6 @@
 package com.transactionapi.security;
 
+import com.transactionapi.constants.ApiPaths;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,24 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        String requestPath = request.getRequestURI();
+        String method = request.getMethod();
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // Public share endpoint: IP-based rate limiting for unauthenticated, user-based for authenticated
+        if ("GET".equals(method) && requestPath != null && requestPath.matches(ApiPaths.SHARES + "/[^/]+")) {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                String ipAddress = getClientIp(request);
+                if (!rateLimiterService.allowPublicShare(ipAddress)) {
+                    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                    response.getWriter().write("Too many requests. Please try again later.");
+                    return;
+                }
+                filterChain.doFilter(request, response);
+                return;
+            }
+        }
+
         if (authentication == null || !authentication.isAuthenticated()) {
             filterChain.doFilter(request, response);
             return;
@@ -49,5 +67,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip != null ? ip : "unknown";
     }
 }
