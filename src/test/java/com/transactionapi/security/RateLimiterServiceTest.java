@@ -8,7 +8,7 @@ class RateLimiterServiceTest {
 
     @Test
     void blocksAfterLimit() {
-        RateLimiterService limiter = new RateLimiterService(2, 60_000);
+        RateLimiterService limiter = new RateLimiterService(2, 2, 60_000);
 
         assertThat(limiter.allow("user-1")).isTrue();
         assertThat(limiter.allow("user-1")).isTrue();
