@@ -1,5 +1,6 @@
 package com.transactionapi.security;
 
+import com.transactionapi.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -18,6 +19,8 @@ import java.util.stream.Collectors;
 @Component
 public class UserIdResolver {
 
+    private final UserService userService;
+
     @Value("${app.security.dev-user-id:}")
     private String devUserId;
 
@@ -29,6 +32,10 @@ public class UserIdResolver {
 
     private Set<String> allowedEmailSet = Collections.emptySet();
     private Set<String> adminEmailSet = Collections.emptySet();
+
+    public UserIdResolver(UserService userService) {
+        this.userService = userService;
+    }
 
     @PostConstruct
     void init() {
@@ -77,9 +84,11 @@ public class UserIdResolver {
         }
         String email = resolveEmail(authentication);
         if (!StringUtils.hasText(email)) {
+            registerBlockedUser(authentication, null);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
         }
         if (!allowedEmailSet.contains(email.toLowerCase())) {
+            registerBlockedUser(authentication, email);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
         }
     }
@@ -94,6 +103,31 @@ public class UserIdResolver {
             }
         }
         return null;
+    }
+
+    private String resolveAuthId(Authentication authentication) {
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            Jwt jwt = jwtAuth.getToken();
+            if (StringUtils.hasText(jwt.getSubject())) {
+                return jwt.getSubject();
+            }
+            String email = jwt.getClaimAsString("email");
+            if (StringUtils.hasText(email)) {
+                return email;
+            }
+        }
+        if (authentication != null && authentication.getPrincipal() instanceof String principal
+                && StringUtils.hasText(principal)) {
+            return principal;
+        }
+        return null;
+    }
+
+    private void registerBlockedUser(Authentication authentication, String email) {
+        String authId = resolveAuthId(authentication);
+        if (StringUtils.hasText(authId)) {
+            userService.ensureUserExists(authId, email);
+        }
     }
 
     private Set<String> parseEmails(String emails) {
