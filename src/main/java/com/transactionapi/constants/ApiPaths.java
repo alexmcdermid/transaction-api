@@ -8,6 +8,7 @@ public final class ApiPaths {
     public static final String ADMIN_USERS = ADMIN + "/users";
     public static final String SHARES = API_V1 + "/shares";
     public static final String USERS = API_V1 + "/users";
+    public static final String USER_ME = USERS + "/me";
     public static final String USER_PREFERENCES = USERS + "/me/preferences";
 
     private ApiPaths() {
