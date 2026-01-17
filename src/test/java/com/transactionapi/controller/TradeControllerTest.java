@@ -136,6 +136,18 @@ class TradeControllerTest {
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].symbol").value("TSLA"))
                 .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("page", "0")
+                                .param("size", "5")
+                                .param("date", "2024-06-12")
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

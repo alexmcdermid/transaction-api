@@ -317,6 +317,60 @@ class TradeServiceTest {
     }
 
     @Test
+    void paginatesWithinDayWhenRequested() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "DAY-1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "DAY-2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.SHORT,
+                        1,
+                        new BigDecimal("2"),
+                        new BigDecimal("1"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 2),
+                        LocalDate.of(2024, 5, 11),
+                        null
+                ),
+                USER_ID
+        );
+
+        PagedResponse<TradeResponse> dayOnly = tradeService.listTrades(
+                USER_ID,
+                0,
+                5,
+                null,
+                LocalDate.of(2024, 5, 10)
+        );
+
+        assertThat(dayOnly.totalElements()).isEqualTo(1);
+        assertThat(dayOnly.items()).extracting(TradeResponse::symbol)
+                .containsExactly("DAY-1");
+    }
+
+    @Test
     void summarizesSpecificMonthOnly() {
         tradeService.createTrade(
                 new TradeRequest(

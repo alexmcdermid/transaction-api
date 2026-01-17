@@ -26,6 +26,12 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
             Pageable pageable
     );
 
+    Page<Trade> findByUserIdAndClosedAtOrderByClosedAtDesc(
+            String userId,
+            LocalDate closedAt,
+            Pageable pageable
+    );
+
     List<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(String userId, LocalDate start, LocalDate end);
 
     Optional<Trade> findByIdAndUserId(UUID id, String userId);

@@ -62,10 +62,22 @@ public class TradeService {
     }
 
     public PagedResponse<TradeResponse> listTrades(String userId, int page, int size, YearMonth month) {
+        return listTrades(userId, page, size, month, null);
+    }
+
+    public PagedResponse<TradeResponse> listTrades(
+            String userId,
+            int page,
+            int size,
+            YearMonth month,
+            LocalDate day
+    ) {
         int boundedSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), boundedSize);
         Page<Trade> result;
-        if (month != null) {
+        if (day != null) {
+            result = tradeRepository.findByUserIdAndClosedAtOrderByClosedAtDesc(userId, day, pageable);
+        } else if (month != null) {
             LocalDate start = month.atDay(1);
             LocalDate end = month.atEndOfMonth();
             result = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(userId, start, end, pageable);

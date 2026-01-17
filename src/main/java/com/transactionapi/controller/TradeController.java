@@ -65,11 +65,12 @@ public class TradeController {
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
-            @RequestParam(required = false) String month
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) String date
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.listTrades(userId, page, size, parseMonth(month));
+        return tradeService.listTrades(userId, page, size, parseMonth(month), parseDate(date));
     }
 
     @PutMapping("/{tradeId}")
@@ -126,6 +127,20 @@ public class TradeController {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Invalid month format, expected YYYY-MM"
+            );
+        }
+    }
+
+    private static java.time.LocalDate parseDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return java.time.LocalDate.parse(value.trim());
+        } catch (Exception e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid date format, expected YYYY-MM-DD"
             );
         }
     }
