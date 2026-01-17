@@ -1,7 +1,11 @@
 package com.transactionapi.model;
 
+import com.transactionapi.constants.PnlDisplayMode;
+import com.transactionapi.constants.ThemeMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
@@ -29,6 +33,14 @@ public class User {
 
     @Column(name = "premium", nullable = false)
     private boolean premium = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "theme_mode", length = 16)
+    private ThemeMode themeMode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pnl_display_mode", length = 16)
+    private PnlDisplayMode pnlDisplayMode;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -74,6 +86,22 @@ public class User {
 
     public void setPremium(boolean premium) {
         this.premium = premium;
+    }
+
+    public ThemeMode getThemeMode() {
+        return themeMode;
+    }
+
+    public void setThemeMode(ThemeMode themeMode) {
+        this.themeMode = themeMode;
+    }
+
+    public PnlDisplayMode getPnlDisplayMode() {
+        return pnlDisplayMode;
+    }
+
+    public void setPnlDisplayMode(PnlDisplayMode pnlDisplayMode) {
+        this.pnlDisplayMode = pnlDisplayMode;
     }
 
     public Instant getCreatedAt() {

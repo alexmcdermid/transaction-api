@@ -25,6 +25,7 @@ public record TradeResponse(
         LocalDate openedAt,
         LocalDate closedAt,
         BigDecimal realizedPnl,
+        BigDecimal pnlPercent,
         String notes,
         Instant createdAt,
         Instant updatedAt

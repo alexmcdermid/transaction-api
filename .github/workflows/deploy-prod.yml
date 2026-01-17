@@ -1,5 +1,11 @@
 name: Deploy Backend (Prod)
-
+# TODO: Rework prod infrastructure for security best practices
+# Dev setup: App Runner + Neon DB (public) - no VPC (acceptable for dev/test data)
+# Prod requirements:
+# - Private RDS/Aurora in VPC for database security
+# - App Runner with VPC connector to access private RDS
+# - VPC with NAT Gateway for outbound internet access (OAuth, external APIs, etc.)
+# Note: App Runner in VPC requires NAT Gateway for outbound internet connectivity
 on:
   workflow_dispatch:
 

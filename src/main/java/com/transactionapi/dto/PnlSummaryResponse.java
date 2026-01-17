@@ -7,6 +7,7 @@ import java.util.List;
 public record PnlSummaryResponse(
         BigDecimal totalPnl,
         int tradeCount,
+        BigDecimal pnlPercent,
         List<PnlBucketResponse> daily,
         List<PnlBucketResponse> monthly,
         BigDecimal cadToUsdRate,

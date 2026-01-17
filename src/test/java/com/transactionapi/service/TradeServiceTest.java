@@ -159,16 +159,21 @@ class TradeServiceTest {
 
         assertThat(summary.totalPnl()).isEqualByComparingTo("89.00");
         assertThat(summary.tradeCount()).isEqualTo(3);
+        assertThat(summary.pnlPercent()).isEqualByComparingTo("17.80");
 
         assertThat(summary.daily()).extracting(bucket -> bucket.period())
                 .containsExactly("2024-06-01", "2024-05-02", "2024-05-01");
         assertThat(summary.daily()).extracting(bucket -> bucket.pnl().toPlainString())
                 .containsExactly("99.00", "-30.00", "20.00");
+        assertThat(summary.daily()).extracting(bucket -> bucket.pnlPercent().toPlainString())
+                .containsExactly("66.00", "-12.00", "20.00");
 
         assertThat(summary.monthly()).extracting(bucket -> bucket.period())
                 .containsExactly("2024-06", "2024-05");
         assertThat(summary.monthly()).extracting(bucket -> bucket.pnl().toPlainString())
                 .containsExactly("99.00", "-10.00");
+        assertThat(summary.monthly()).extracting(bucket -> bucket.pnlPercent().toPlainString())
+                .containsExactly("66.00", "-2.86");
     }
 
     @Test
@@ -371,6 +376,7 @@ class TradeServiceTest {
         assertThat(stats.tradeCount()).isEqualTo(0);
         assertThat(stats.bestDay()).isNull();
         assertThat(stats.bestMonth()).isNull();
+        assertThat(stats.pnlPercent()).isNull();
     }
 
     @Test
@@ -419,6 +425,7 @@ class TradeServiceTest {
 
         assertThat(stats.totalPnl()).isEqualByComparingTo("125.00");
         assertThat(stats.tradeCount()).isEqualTo(2);
+        assertThat(stats.pnlPercent()).isEqualByComparingTo("10.00");
     }
 
     @Test

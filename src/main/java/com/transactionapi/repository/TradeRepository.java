@@ -81,6 +81,22 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
         """, nativeQuery = true)
     MonthlyAggregateProjection findBestMonthByUserId(@Param("userId") String userId, @Param("cadToUsd") BigDecimal cadToUsdRate);
 
+    @Query(value = """
+        select sum(
+            case
+                when currency = 'CAD' then (
+                    entry_price * quantity *
+                    case when asset_type = 'OPTION' then 100 else 1 end
+                ) * CAST(:cadToUsd AS numeric)
+                else entry_price * quantity *
+                    case when asset_type = 'OPTION' then 100 else 1 end
+            end
+        )
+        from trades
+        where user_id = :userId
+        """, nativeQuery = true)
+    BigDecimal sumNotionalByUserId(@Param("userId") String userId, @Param("cadToUsd") BigDecimal cadToUsdRate);
+
     interface DailyAggregateProjection {
         LocalDate getPeriod();
         BigDecimal getPnl();

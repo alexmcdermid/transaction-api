@@ -101,28 +101,42 @@ public class TradeService {
         } else {
             trades = tradeRepository.findAllForUser(userId);
         }
-        BigDecimal total = sumPnl(trades);
+        BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
+        BigDecimal total = sumPnl(trades, cadToUsdRate);
+        BigDecimal totalNotional = sumNotional(trades, cadToUsdRate);
+        BigDecimal pnlPercent = computePnlPercent(total, totalNotional);
 
         Map<LocalDate, List<Trade>> byDay = trades.stream()
                 .collect(Collectors.groupingBy(Trade::getClosedAt));
         List<PnlBucketResponse> daily = byDay.entrySet().stream()
                 .sorted(Map.Entry.<LocalDate, List<Trade>>comparingByKey().reversed())
-                .map(entry -> new PnlBucketResponse(entry.getKey().toString(), sumPnl(entry.getValue()), entry.getValue().size()))
+                .map(entry -> {
+                    BigDecimal dayPnl = sumPnl(entry.getValue(), cadToUsdRate);
+                    BigDecimal dayNotional = sumNotional(entry.getValue(), cadToUsdRate);
+                    BigDecimal dayPercent = computePnlPercent(dayPnl, dayNotional);
+                    return new PnlBucketResponse(entry.getKey().toString(), dayPnl, entry.getValue().size(), dayPercent);
+                })
                 .toList();
 
         Map<YearMonth, List<Trade>> byMonth = trades.stream()
                 .collect(Collectors.groupingBy(t -> YearMonth.from(t.getClosedAt())));
         List<PnlBucketResponse> monthly = byMonth.entrySet().stream()
                 .sorted(Map.Entry.<YearMonth, List<Trade>>comparingByKey().reversed())
-                .map(entry -> new PnlBucketResponse(entry.getKey().toString(), sumPnl(entry.getValue()), entry.getValue().size()))
+                .map(entry -> {
+                    BigDecimal monthPnl = sumPnl(entry.getValue(), cadToUsdRate);
+                    BigDecimal monthNotional = sumNotional(entry.getValue(), cadToUsdRate);
+                    BigDecimal monthPercent = computePnlPercent(monthPnl, monthNotional);
+                    return new PnlBucketResponse(entry.getKey().toString(), monthPnl, entry.getValue().size(), monthPercent);
+                })
                 .toList();
 
         return new PnlSummaryResponse(
                 total,
                 trades.size(),
+                pnlPercent,
                 daily,
                 monthly,
-                exchangeRateService.cadToUsd(),
+                cadToUsdRate,
                 exchangeRateService.lastUpdatedOn()
         );
     }
@@ -142,6 +156,8 @@ public class TradeService {
             totalPnl = BigDecimal.ZERO;
         }
         totalPnl = totalPnl.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalNotional = tradeRepository.sumNotionalByUserId(userId, cadToUsdRate);
+        BigDecimal pnlPercent = computePnlPercent(totalPnl, totalNotional);
 
         // Get best day using database query (returns only top result)
         TradeRepository.DailyAggregateProjection bestDayProj = tradeRepository.findBestDayByUserId(userId, cadToUsdRate);
@@ -152,7 +168,8 @@ public class TradeService {
                 bestDay = new PnlBucketResponse(
                         bestDayProj.getPeriod().toString(),
                         pnl.setScale(2, RoundingMode.HALF_UP),
-                        bestDayProj.getTrades()
+                        bestDayProj.getTrades(),
+                        null
                 );
             }
         }
@@ -166,7 +183,8 @@ public class TradeService {
                 bestMonth = new PnlBucketResponse(
                         monthProj.getPeriod(),
                         pnl.setScale(2, RoundingMode.HALF_UP),
-                        monthProj.getTrades()
+                        monthProj.getTrades(),
+                        null
                 );
             }
         }
@@ -174,6 +192,7 @@ public class TradeService {
         return new AggregateStatsResponse(
                 totalPnl,
                 tradeCount,
+                pnlPercent,
                 bestDay,
                 bestMonth,
                 cadToUsdRate,
@@ -225,21 +244,68 @@ public class TradeService {
         return gross.subtract(fees).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal sumPnl(List<Trade> trades) {
+    private BigDecimal sumPnl(List<Trade> trades, BigDecimal cadToUsdRate) {
         return trades.stream()
-                .map(this::toUsd)
+                .map(trade -> toUsd(trade, cadToUsdRate))
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal toUsd(Trade trade) {
+    private BigDecimal sumNotional(List<Trade> trades, BigDecimal cadToUsdRate) {
+        return trades.stream()
+                .map(trade -> toUsdNotional(trade, cadToUsdRate))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal toUsd(Trade trade, BigDecimal cadToUsdRate) {
         Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
-        BigDecimal rate = currency == Currency.CAD ? exchangeRateService.cadToUsd() : BigDecimal.ONE;
+        BigDecimal rate = currency == Currency.CAD ? cadToUsdRate : BigDecimal.ONE;
         return trade.getRealizedPnl().multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
+    private BigDecimal toUsdNotional(Trade trade, BigDecimal cadToUsdRate) {
+        if (trade.getEntryPrice() == null || trade.getQuantity() == null) {
+            return null;
+        }
+        BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
+        BigDecimal notional = trade.getEntryPrice()
+                .multiply(BigDecimal.valueOf(trade.getQuantity()))
+                .multiply(multiplier)
+                .abs();
+        if (trade.getCurrency() == Currency.CAD) {
+            return notional.multiply(cadToUsdRate);
+        }
+        return notional;
+    }
+
+    private BigDecimal toTradeNotional(Trade trade) {
+        if (trade.getEntryPrice() == null || trade.getQuantity() == null) {
+            return null;
+        }
+        BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
+        return trade.getEntryPrice()
+                .multiply(BigDecimal.valueOf(trade.getQuantity()))
+                .multiply(multiplier)
+                .abs();
+    }
+
+    private BigDecimal computePnlPercent(BigDecimal totalPnl, BigDecimal totalNotional) {
+        if (totalPnl == null || totalNotional == null) {
+            return null;
+        }
+        if (totalNotional.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return totalPnl
+                .multiply(BigDecimal.valueOf(100))
+                .divide(totalNotional, 2, RoundingMode.HALF_UP);
+    }
+
     private TradeResponse toResponse(Trade trade) {
+        BigDecimal pnlPercent = computePnlPercent(trade.getRealizedPnl(), toTradeNotional(trade));
         return new TradeResponse(
                 trade.getId(),
                 trade.getSymbol(),
@@ -256,6 +322,7 @@ public class TradeService {
                 trade.getOpenedAt(),
                 trade.getClosedAt(),
                 trade.getRealizedPnl(),
+                pnlPercent,
                 trade.getNotes(),
                 trade.getCreatedAt(),
                 trade.getUpdatedAt()
