@@ -11,7 +11,7 @@ This API provides endpoints to:
 - **Multi-currency support** - Handle USD and CAD trades with automatic FX conversion
 - **Share trades** - Generate shareable links for individual trades
 
-Trades are stored per-user in PostgreSQL. Authentication is handled via Google OAuth (JWT tokens). The API supports both long and short positions for stocks and options (calls/puts).
+Trades are stored per-user in PostgreSQL. Authentication is handled via Neon Auth (JWT tokens) with Google as the only provider for now. The API supports both long and short positions for stocks and options (calls/puts).
 
 ## Key Features
 
@@ -25,7 +25,7 @@ Trades are stored per-user in PostgreSQL. Authentication is handled via Google O
 
 - Spring Boot 3 / Java 21
 - PostgreSQL with Flyway migrations
-- JWT authentication (Google OAuth)
+- JWT authentication (Neon Auth)
 - Deployed on AWS App Runner
 
 ## Development
