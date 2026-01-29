@@ -110,6 +110,8 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `DEV_GOOGLE_JWK_SET` (optional)
 
 ### Required GitHub Secrets (Prod)
+- `AWS_REGION`
+- `AWS_ROLE_ARN`
 - `PROD_ECR_TRANSACTION_API_REPO`
 - `PROD_BACKEND_SERVICE_ARN` (App Runner service ARN)
 - `PROD_DATABASE_URL`
