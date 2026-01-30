@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -23,7 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * Fetches CAD/USD once per startup and daily from the CBSA/BoC endpoint.
+ * Fetches CAD/USD once per startup and daily from either DynamoDB (dev/prod)
+ * or the CBSA/BoC endpoint (local).
  * Converts CAD-per-USD to USD-per-CAD and caches the value with a fallback.
  */
 @Service
@@ -40,16 +42,22 @@ public class ExchangeRateService {
     private final ZoneId effectiveZone;
     private final AtomicReference<BigDecimal> cadToUsd = new AtomicReference<>();
     private final AtomicReference<LocalDate> lastUpdated = new AtomicReference<>();
+    private final String fxSource;
+    private final DynamoExchangeRateReader dynamoReader;
 
     public ExchangeRateService(
             RestTemplateBuilder builder,
             ExchangeRateRepository exchangeRateRepository,
+            ObjectProvider<DynamoExchangeRateReader> dynamoReaderProvider,
+            @Value("${app.fx.source:http}") String fxSource,
             @Value("${app.fx.cad-usd.url:https://bcd-api-dca-ipa.cbsa-asfc.cloud-nuage.canada.ca/exchange-rate-lambda/exchange-rates}") String endpoint,
             @Value("${app.fx.cad-usd.fallback:0.732}") BigDecimal fallbackRate,
             @Value("${app.fx.timeout-ms:2000}") int timeoutMs,
             @Value("${app.fx.effective-zone:America/Los_Angeles}") String effectiveZoneId
     ) {
         this.exchangeRateRepository = exchangeRateRepository;
+        this.dynamoReader = dynamoReaderProvider.getIfAvailable();
+        this.fxSource = normalizeSource(fxSource);
         this.endpoint = endpoint;
         this.fallbackRate = fallbackRate.setScale(3, RoundingMode.HALF_UP);
         this.effectiveZone = parseZone(effectiveZoneId);
@@ -76,13 +84,44 @@ public class ExchangeRateService {
 
     @PostConstruct
     public void init() {
-        log.info("Initializing CAD/USD rate with fallback {}", cadToUsd.get());
+        log.info("Initializing CAD/USD rate with fallback {} (source={})", cadToUsd.get(), fxSource);
         loadLatestFromDatabase();
         refreshDaily();
     }
 
     @Scheduled(cron = "0 30 2 * * *")
     public void refreshDaily() {
+        if (useDynamo()) {
+            refreshFromDynamo();
+            return;
+        }
+        refreshFromEndpoint();
+    }
+
+    private void refreshFromDynamo() {
+        if (dynamoReader == null) {
+            log.warn("FX source set to dynamo but no DynamoExchangeRateReader bean found; keeping cached {}", cadToUsd.get());
+            return;
+        }
+        try {
+            log.info("Refreshing CAD/USD rate from DynamoDB");
+            DynamoExchangeRateReader.RateQuote quote = dynamoReader.getCadUsdLatest();
+
+            if (quote != null) {
+                BigDecimal rate = quote.rate().setScale(6, RoundingMode.HALF_UP);
+                cadToUsd.set(rate);
+                lastUpdated.set(quote.date());
+                persistRateQuote(new RateQuote(rate, quote.date()));
+                log.info("CAD/USD rate updated to {} on {}", rate, quote.date());
+            } else {
+                log.warn("No usable CAD/USD item in DynamoDB, keeping cached {}", cadToUsd.get());
+            }
+        } catch (Exception ex) {
+            log.warn("Unable to refresh CAD/USD from DynamoDB, keeping cached {}", cadToUsd.get(), ex);
+        }
+    }
+
+    private void refreshFromEndpoint() {
         try {
             log.info("Refreshing CAD/USD rate from {}", endpoint);
             Map<?, ?> response = restTemplate.getForObject(endpoint, Map.class);
@@ -210,6 +249,17 @@ public class ExchangeRateService {
     }
 
     private record RateQuote(BigDecimal rate, LocalDate date) {
+    }
+
+    private boolean useDynamo() {
+        return "dynamo".equalsIgnoreCase(fxSource);
+    }
+
+    private String normalizeSource(String source) {
+        if (source == null || source.isBlank()) {
+            return "http";
+        }
+        return source.trim();
     }
 
     private ZoneId parseZone(String zoneId) {

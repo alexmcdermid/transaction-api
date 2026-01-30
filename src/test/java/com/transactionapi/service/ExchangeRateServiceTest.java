@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
@@ -40,6 +41,9 @@ class ExchangeRateServiceTest {
     @Mock
     private ExchangeRateRepository exchangeRateRepository;
 
+    @Mock
+    private ObjectProvider<DynamoExchangeRateReader> dynamoReaderProvider;
+
     private ExchangeRateService exchangeRateService;
 
     @BeforeEach
@@ -48,9 +52,12 @@ class ExchangeRateServiceTest {
                 org.mockito.ArgumentMatchers.<Supplier<ClientHttpRequestFactory>>any()
         )).thenReturn(restTemplateBuilder);
         when(restTemplateBuilder.build()).thenReturn(restTemplate);
+        when(dynamoReaderProvider.getIfAvailable()).thenReturn(null);
         exchangeRateService = new ExchangeRateService(
                 restTemplateBuilder,
                 exchangeRateRepository,
+                dynamoReaderProvider,
+                "http",
                 ENDPOINT,
                 new BigDecimal("0.732"),
                 2000,

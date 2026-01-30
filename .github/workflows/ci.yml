@@ -61,6 +61,9 @@ jobs:
           APP_SECURITY_JWT_ISSUER_URI: "https://accounts.google.com"
           APP_SECURITY_JWT_AUDIENCE: ${{ secrets.DEV_GOOGLE_CLIENT_ID }}
           APP_SECURITY_JWT_JWK_SET: ${{ secrets.DEV_GOOGLE_JWK_SET }}
+          APP_FX_SOURCE: "dynamo"
+          APP_AWS_REGION: ${{ secrets.AWS_REGION }}
+          APP_FX_DYNAMO_TABLE: "ExchangeRates"
         run: |
           set -euo pipefail
           python - <<'PY' > /tmp/apprunner-backend.json
@@ -80,6 +83,9 @@ jobs:
               "APP_SECURITY_ALLOW_HEADER_AUTH": required("APP_SECURITY_ALLOW_HEADER_AUTH"),
               "APP_SECURITY_JWT_ISSUER_URI": required("APP_SECURITY_JWT_ISSUER_URI"),
               "APP_SECURITY_JWT_AUDIENCE": required("APP_SECURITY_JWT_AUDIENCE"),
+              "APP_FX_SOURCE": required("APP_FX_SOURCE"),
+              "APP_AWS_REGION": required("APP_AWS_REGION"),
+              "APP_FX_DYNAMO_TABLE": required("APP_FX_DYNAMO_TABLE"),
           }
           
           optional = {
