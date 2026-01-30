@@ -127,6 +127,13 @@ Role permissions for App Runner deploys must include:
 
 ## Architecture
 
+### FX Rates (BoC -> DynamoDB -> App Runner)
+- **Goal:** keep App Runner inside a VPC to reach Neon/RDS without requiring outbound internet/NAT for BoC.
+- **Flow:** Lambda (outside VPC) fetches BoC/CBSA FX, writes latest CADUSD into DynamoDB.
+- **App Runner:** reads the latest CAD/USD rate from DynamoDB on startup + daily schedule.
+- **Local:** uses the direct BoC/CBSA HTTP call for quick debugging.
+- **Why DynamoDB:** stable, low-cost, VPC-friendly via a DynamoDB gateway endpoint.
+
 ### Performance Optimizations
 - **Aggregate Stats Endpoint** (`/api/v1/trades/stats`) uses database-level aggregation with native SQL queries for O(1) memory usage
 - **CAD to USD Conversion** performed in SQL queries using CASE expressions
