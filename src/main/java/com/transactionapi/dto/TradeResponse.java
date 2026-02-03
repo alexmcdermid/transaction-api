@@ -19,6 +19,7 @@ public record TradeResponse(
         BigDecimal entryPrice,
         BigDecimal exitPrice,
         BigDecimal fees,
+        BigDecimal marginRate,
         OptionType optionType,
         BigDecimal strikePrice,
         LocalDate expiryDate,

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class TradeService {
 
     private static final BigDecimal OPTION_MULTIPLIER = BigDecimal.valueOf(100);
+    private static final BigDecimal DAYS_IN_YEAR = BigDecimal.valueOf(365);
+    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TradeRepository tradeRepository;
     private final ExchangeRateService exchangeRateService;
@@ -230,6 +233,7 @@ public class TradeService {
         trade.setEntryPrice(request.entryPrice());
         trade.setExitPrice(request.exitPrice());
         trade.setFees(request.fees() != null ? request.fees() : BigDecimal.ZERO);
+        trade.setMarginRate(request.marginRate() != null ? request.marginRate() : BigDecimal.ZERO);
         if (request.assetType() == AssetType.OPTION) {
             trade.setOptionType(request.optionType());
             trade.setStrikePrice(request.strikePrice());
@@ -253,7 +257,30 @@ public class TradeService {
         BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
         BigDecimal gross = movement.multiply(BigDecimal.valueOf(trade.getQuantity())).multiply(multiplier);
         BigDecimal fees = trade.getFees() != null ? trade.getFees() : BigDecimal.ZERO;
-        return gross.subtract(fees).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal marginFee = calculateMarginFee(trade);
+        return gross.subtract(fees).subtract(marginFee).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateMarginFee(Trade trade) {
+        BigDecimal marginRate = trade.getMarginRate();
+        if (marginRate == null || marginRate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (trade.getOpenedAt() == null || trade.getClosedAt() == null) {
+            return BigDecimal.ZERO;
+        }
+        long daysHeld = ChronoUnit.DAYS.between(trade.getOpenedAt(), trade.getClosedAt());
+        if (daysHeld <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal notional = toTradeNotional(trade);
+        if (notional == null || notional.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal yearFraction = BigDecimal.valueOf(daysHeld)
+                .divide(DAYS_IN_YEAR, 10, RoundingMode.HALF_UP);
+        BigDecimal rate = marginRate.divide(ONE_HUNDRED, 10, RoundingMode.HALF_UP);
+        return notional.multiply(rate).multiply(yearFraction).setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumPnl(List<Trade> trades, BigDecimal cadToUsdRate) {
@@ -328,6 +355,7 @@ public class TradeService {
                 trade.getEntryPrice(),
                 trade.getExitPrice(),
                 trade.getFees(),
+                trade.getMarginRate(),
                 trade.getOptionType(),
                 trade.getStrikePrice(),
                 trade.getExpiryDate(),
