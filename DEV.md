@@ -60,11 +60,12 @@ mvn test -Dtest=TradeServiceTest
 ### Production Mode (JWT)
 Set the following properties:
 - `app.security.jwt.enabled=true`
-- `app.security.jwt.issuer-uri=https://accounts.google.com`
-- `app.security.jwt.audience=<Google client id>`
+- `app.security.jwt.issuer-uri=<Neon Auth URL>`
+- `app.security.jwt.jwk-set-uri=<Neon Auth URL>/jwks`
+- `app.security.jwt.audience=<Neon Auth URL>` (optional)
 - `app.security.allow-header-auth=false`
 
-Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
+Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id. Neon Auth is configured to allow Google sign-in only (no email/password) for now.
 
 ### Admin Access
 - `app.security.admin-emails` (comma-separated list)
@@ -85,13 +86,15 @@ Required:
 - `APP_CORS_ALLOWED_ORIGINS`
 - `APP_SECURITY_JWT_ENABLED=true`
 - `APP_SECURITY_ALLOW_HEADER_AUTH=false`
-- `APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com`
-- `APP_SECURITY_JWT_AUDIENCE=<Google client id>`
+- `APP_SECURITY_JWT_ISSUER_URI=<Neon Auth URL>`
+- `APP_SECURITY_JWT_JWK_SET_URI=<Neon Auth URL>/jwks` (or `APP_SECURITY_JWT_JWK_SET` with inline JWKS)
+- `APP_SECURITY_JWT_AUDIENCE=<Neon Auth URL>` (optional)
 
 Optional:
 - `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
 - `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
-- `APP_SECURITY_JWT_JWK_SET` (pin JWKS JSON)
+- `APP_SECURITY_JWT_JWK_SET_URI` (pin JWKS URL)
+- `APP_SECURITY_JWT_JWK_SET` (inline JWKS JSON for VPC/no outbound)
 
 ## CI/CD (GitHub Actions)
 
@@ -106,8 +109,9 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `DEV_CORS_ALLOWED_ORIGINS`
 - `DEV_ALLOWED_EMAILS` (optional)
 - `DEV_ADMIN_EMAILS` (optional)
-- `DEV_GOOGLE_CLIENT_ID`
-- `DEV_GOOGLE_JWK_SET` (optional)
+- `DEV_NEON_AUTH_URL`
+- `DEV_JWT_JWK_SET_URI` (optional)
+- `DEV_JWT_JWK_SET` (optional; inline JWKS JSON)
 
 ### Required GitHub Secrets (Prod)
 - `AWS_REGION`
@@ -116,8 +120,9 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `PROD_BACKEND_SERVICE_ARN` (App Runner service ARN)
 - `PROD_DATABASE_URL`
 - `PROD_CORS_ALLOWED_ORIGINS`
-- `PROD_GOOGLE_CLIENT_ID`
-- `PROD_GOOGLE_JWK_SET` (optional)
+- `PROD_NEON_AUTH_URL`
+- `PROD_JWT_JWK_SET_URI` (optional)
+- `PROD_JWT_JWK_SET` (optional; inline JWKS JSON)
 - `PROD_ADMIN_EMAILS` (optional)
 
 ### OIDC Permissions
