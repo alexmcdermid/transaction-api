@@ -365,6 +365,70 @@ class TradeControllerTest {
     }
 
     @Test
+    void scopedAggregateStatsAcceptsDayParameter() throws Exception {
+        String scopedUserId = "scoped-day-user";
+        TradeRequest feb5 = new TradeRequest(
+                "FEB-1",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("106.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 2, 5),
+                LocalDate.of(2024, 2, 5),
+                null
+        );
+        TradeRequest feb20 = new TradeRequest(
+                "FEB-2",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                5,
+                new BigDecimal("20.00"),
+                new BigDecimal("27.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 2, 20),
+                LocalDate.of(2024, 2, 20),
+                null
+        );
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(feb5))
+                )
+                .andExpect(status().isCreated());
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(feb20))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats/scoped")
+                                .header("X-User-Id", scopedUserId)
+                                .param("day", "2024-02-20")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2024))
+                .andExpect(jsonPath("$.month").value("2024-02"))
+                .andExpect(jsonPath("$.day").value("2024-02-20"))
+                .andExpect(jsonPath("$.bestDay.period").value("2024-02-20"))
+                .andExpect(jsonPath("$.bestDay.pnl").value(35));
+    }
+
+    @Test
     void userCannotAccessAnotherUsersTrades() throws Exception {
         String userA = "user-a";
         String userB = "user-b";

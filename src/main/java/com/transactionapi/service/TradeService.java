@@ -213,16 +213,18 @@ public class TradeService {
                 cadToUsdRate,
                 exchangeRateService.lastUpdatedOn(),
                 null,
+                null,
                 null
         );
     }
 
     /**
-     * Scoped aggregate stats for a year, with best day scoped to a month.
-     * If month is omitted, best day is computed from the best month in the year.
+     * Scoped aggregate stats for a year.
+     * When month is provided, best day is computed for that month.
+     * When day is provided, best day is that exact day.
      */
-    public AggregateStatsResponse getScopedAggregateStats(String userId, Integer year, YearMonth month) {
-        int scopedYear = resolveScopedYear(userId, year, month);
+    public AggregateStatsResponse getScopedAggregateStats(String userId, Integer year, YearMonth month, LocalDate day) {
+        int scopedYear = resolveScopedYear(userId, year, month, day);
         YearMonth yearStart = YearMonth.of(scopedYear, 1);
         LocalDate startDate = yearStart.atDay(1);
         LocalDate endDate = startDate.plusYears(1);
@@ -254,12 +256,21 @@ public class TradeService {
 
         YearMonth scopedMonth = month != null
                 ? month
-                : bestMonth != null
-                        ? YearMonth.parse(bestMonth.period())
-                        : null;
+                : day != null
+                        ? YearMonth.from(day)
+                        : bestMonth != null
+                                ? YearMonth.parse(bestMonth.period())
+                                : null;
 
         PnlBucketResponse bestDay = null;
-        if (scopedMonth != null) {
+        if (day != null) {
+            TradeRepository.DailyAggregateProjection dayProjection = tradeRepository.findDayByUserIdAndDate(
+                    userId,
+                    cadToUsdRate,
+                    day
+            );
+            bestDay = toBestDayBucket(dayProjection);
+        } else if (scopedMonth != null) {
             LocalDate monthStart = scopedMonth.atDay(1);
             LocalDate monthEnd = monthStart.plusMonths(1);
             TradeRepository.DailyAggregateProjection dayProjection = tradeRepository.findBestDayByUserIdAndDateRange(
@@ -280,11 +291,15 @@ public class TradeService {
                 cadToUsdRate,
                 exchangeRateService.lastUpdatedOn(),
                 scopedYear,
-                scopedMonth != null ? scopedMonth.toString() : null
+                scopedMonth != null ? scopedMonth.toString() : null,
+                day != null ? day.toString() : null
         );
     }
 
-    private int resolveScopedYear(String userId, Integer year, YearMonth month) {
+    private int resolveScopedYear(String userId, Integer year, YearMonth month, LocalDate day) {
+        if (day != null) {
+            return day.getYear();
+        }
         if (month != null) {
             return month.getYear();
         }

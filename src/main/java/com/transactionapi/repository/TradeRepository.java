@@ -114,6 +114,28 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
             count(*) as trades
         from trades
         where user_id = :userId
+          and closed_at = :day
+        group by closed_at
+        limit 1
+        """, nativeQuery = true)
+    DailyAggregateProjection findDayByUserIdAndDate(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("day") LocalDate day
+    );
+
+    @Query(value = """
+        select
+            closed_at as period,
+            sum(
+                case
+                    when currency = 'CAD' then realized_pnl * CAST(:cadToUsd AS numeric)
+                    else realized_pnl
+                end
+            ) as pnl,
+            count(*) as trades
+        from trades
+        where user_id = :userId
           and closed_at >= :startDate
           and closed_at < :endDate
         group by closed_at

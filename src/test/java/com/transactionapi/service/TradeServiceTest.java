@@ -803,7 +803,7 @@ class TradeServiceTest {
                 USER_ID
         );
 
-        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, null);
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, null, null);
 
         assertThat(scoped.year()).isEqualTo(2024);
         assertThat(scoped.totalPnl()).isEqualByComparingTo("100.00");
@@ -875,7 +875,7 @@ class TradeServiceTest {
                 USER_ID
         );
 
-        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, null, null);
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, null, null, null);
 
         assertThat(scoped.year()).isEqualTo(2024);
         assertThat(scoped.totalPnl()).isEqualByComparingTo("120.00");
@@ -947,12 +947,68 @@ class TradeServiceTest {
                 USER_ID
         );
 
-        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, YearMonth.of(2024, 2));
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, YearMonth.of(2024, 2), null);
 
         assertThat(scoped.year()).isEqualTo(2024);
         assertThat(scoped.month()).isEqualTo("2024-02");
         assertThat(scoped.bestDay()).isNotNull();
         assertThat(scoped.bestDay().period()).isEqualTo("2024-02-05");
         assertThat(scoped.bestDay().pnl()).isEqualByComparingTo("60.00");
+    }
+
+    @Test
+    void scopedAggregateStatsUsesRequestedDayWhenProvided() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("106.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 5),
+                        LocalDate.of(2024, 2, 5),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("20.00"),
+                        new BigDecimal("27.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 20),
+                        LocalDate.of(2024, 2, 20),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(
+                USER_ID,
+                null,
+                null,
+                LocalDate.of(2024, 2, 20)
+        );
+
+        assertThat(scoped.year()).isEqualTo(2024);
+        assertThat(scoped.month()).isEqualTo("2024-02");
+        assertThat(scoped.day()).isEqualTo("2024-02-20");
+        assertThat(scoped.bestDay()).isNotNull();
+        assertThat(scoped.bestDay().period()).isEqualTo("2024-02-20");
+        assertThat(scoped.bestDay().pnl()).isEqualByComparingTo("35.00");
     }
 }

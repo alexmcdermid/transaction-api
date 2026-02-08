@@ -116,11 +116,12 @@ public class TradeController {
     public AggregateStatsResponse scopedStats(
             Authentication authentication,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String month
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) String day
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.getScopedAggregateStats(userId, year, parseMonth(month));
+        return tradeService.getScopedAggregateStats(userId, year, parseMonth(month), parseDate(day));
     }
 
     private static java.time.YearMonth parseMonth(String value) {

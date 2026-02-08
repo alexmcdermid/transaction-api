@@ -14,6 +14,7 @@ public record AggregateStatsResponse(
         BigDecimal cadToUsdRate,
         java.time.LocalDate fxDate,
         Integer year,
-        String month
+        String month,
+        String day
 ) {
 }
