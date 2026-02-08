@@ -39,6 +39,20 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
     @Query("select count(t) from Trade t where t.userId = :userId")
     int countByUserId(@Param("userId") String userId);
 
+    @Query("select count(t) from Trade t where t.userId = :userId and t.closedAt >= :startDate and t.closedAt < :endDate")
+    int countByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+        select max(closed_at)
+        from trades
+        where user_id = :userId
+        """, nativeQuery = true)
+    LocalDate findLatestClosedAtByUserId(@Param("userId") String userId);
+
     @Query(value = """
         select sum(
             case 
@@ -50,6 +64,25 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
         where user_id = :userId
         """, nativeQuery = true)
     BigDecimal sumPnlByUserId(@Param("userId") String userId, @Param("cadToUsd") BigDecimal cadToUsdRate);
+
+    @Query(value = """
+        select sum(
+            case
+                when currency = 'CAD' then realized_pnl * CAST(:cadToUsd AS numeric)
+                else realized_pnl
+            end
+        )
+        from trades
+        where user_id = :userId
+          and closed_at >= :startDate
+          and closed_at < :endDate
+        """, nativeQuery = true)
+    BigDecimal sumPnlByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
     @Query(value = """
         select
@@ -71,6 +104,31 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
 
     @Query(value = """
         select
+            closed_at as period,
+            sum(
+                case
+                    when currency = 'CAD' then realized_pnl * CAST(:cadToUsd AS numeric)
+                    else realized_pnl
+                end
+            ) as pnl,
+            count(*) as trades
+        from trades
+        where user_id = :userId
+          and closed_at >= :startDate
+          and closed_at < :endDate
+        group by closed_at
+        order by pnl desc
+        limit 1
+        """, nativeQuery = true)
+    DailyAggregateProjection findBestDayByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+        select
             to_char(closed_at, 'YYYY-MM') as period,
             sum(
                 case 
@@ -88,6 +146,31 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
     MonthlyAggregateProjection findBestMonthByUserId(@Param("userId") String userId, @Param("cadToUsd") BigDecimal cadToUsdRate);
 
     @Query(value = """
+        select
+            to_char(closed_at, 'YYYY-MM') as period,
+            sum(
+                case
+                    when currency = 'CAD' then realized_pnl * CAST(:cadToUsd AS numeric)
+                    else realized_pnl
+                end
+            ) as pnl,
+            count(*) as trades
+        from trades
+        where user_id = :userId
+          and closed_at >= :startDate
+          and closed_at < :endDate
+        group by to_char(closed_at, 'YYYY-MM')
+        order by pnl desc
+        limit 1
+        """, nativeQuery = true)
+    MonthlyAggregateProjection findBestMonthByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
         select sum(
             case
                 when currency = 'CAD' then (
@@ -102,6 +185,29 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
         where user_id = :userId
         """, nativeQuery = true)
     BigDecimal sumNotionalByUserId(@Param("userId") String userId, @Param("cadToUsd") BigDecimal cadToUsdRate);
+
+    @Query(value = """
+        select sum(
+            case
+                when currency = 'CAD' then (
+                    entry_price * quantity *
+                    case when asset_type = 'OPTION' then 100 else 1 end
+                ) * CAST(:cadToUsd AS numeric)
+                else entry_price * quantity *
+                    case when asset_type = 'OPTION' then 100 else 1 end
+            end
+        )
+        from trades
+        where user_id = :userId
+          and closed_at >= :startDate
+          and closed_at < :endDate
+        """, nativeQuery = true)
+    BigDecimal sumNotionalByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
     interface DailyAggregateProjection {
         LocalDate getPeriod();

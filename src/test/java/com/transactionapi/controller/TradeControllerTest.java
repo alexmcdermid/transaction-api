@@ -236,6 +236,135 @@ class TradeControllerTest {
     }
 
     @Test
+    void scopedAggregateStatsReturnsYearScopedData() throws Exception {
+        String scopedUserId = "scoped-stats-user";
+        TradeRequest oldTrade = new TradeRequest(
+                "OLD",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("10.00"),
+                new BigDecimal("20.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2023, 12, 15),
+                LocalDate.of(2023, 12, 15),
+                null
+        );
+        TradeRequest newTrade = new TradeRequest(
+                "NEW",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 10),
+                LocalDate.of(2024, 1, 10),
+                null
+        );
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(oldTrade))
+                )
+                .andExpect(status().isCreated());
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(newTrade))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats/scoped")
+                                .header("X-User-Id", scopedUserId)
+                                .param("year", "2024")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2024))
+                .andExpect(jsonPath("$.tradeCount").value(1))
+                .andExpect(jsonPath("$.totalPnl").value(100))
+                .andExpect(jsonPath("$.bestMonth.period").value("2024-01"))
+                .andExpect(jsonPath("$.month").value("2024-01"))
+                .andExpect(jsonPath("$.bestDay.period").value("2024-01-10"));
+    }
+
+    @Test
+    void scopedAggregateStatsDefaultsToMostRecentTradeYear() throws Exception {
+        String scopedUserId = "scoped-default-year-user";
+        TradeRequest oldTrade = new TradeRequest(
+                "OLD",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("10.00"),
+                new BigDecimal("20.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2022, 6, 10),
+                LocalDate.of(2022, 6, 10),
+                null
+        );
+        TradeRequest newTrade = new TradeRequest(
+                "NEW",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("105.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 3, 5),
+                LocalDate.of(2024, 3, 5),
+                null
+        );
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(oldTrade))
+                )
+                .andExpect(status().isCreated());
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", scopedUserId)
+                                .content(objectMapper.writeValueAsString(newTrade))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats/scoped")
+                                .header("X-User-Id", scopedUserId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2024))
+                .andExpect(jsonPath("$.tradeCount").value(1))
+                .andExpect(jsonPath("$.totalPnl").value(50))
+                .andExpect(jsonPath("$.bestMonth.period").value("2024-03"))
+                .andExpect(jsonPath("$.month").value("2024-03"))
+                .andExpect(jsonPath("$.bestDay.period").value("2024-03-05"));
+    }
+
+    @Test
     void userCannotAccessAnotherUsersTrades() throws Exception {
         String userA = "user-a";
         String userB = "user-b";

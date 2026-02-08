@@ -211,7 +211,114 @@ public class TradeService {
                 bestDay,
                 bestMonth,
                 cadToUsdRate,
-                exchangeRateService.lastUpdatedOn()
+                exchangeRateService.lastUpdatedOn(),
+                null,
+                null
+        );
+    }
+
+    /**
+     * Scoped aggregate stats for a year, with best day scoped to a month.
+     * If month is omitted, best day is computed from the best month in the year.
+     */
+    public AggregateStatsResponse getScopedAggregateStats(String userId, Integer year, YearMonth month) {
+        int scopedYear = resolveScopedYear(userId, year, month);
+        YearMonth yearStart = YearMonth.of(scopedYear, 1);
+        LocalDate startDate = yearStart.atDay(1);
+        LocalDate endDate = startDate.plusYears(1);
+
+        BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
+        int tradeCount = tradeRepository.countByUserIdAndDateRange(userId, startDate, endDate);
+
+        BigDecimal totalPnl = tradeRepository.sumPnlByUserIdAndDateRange(userId, cadToUsdRate, startDate, endDate);
+        if (totalPnl == null) {
+            totalPnl = BigDecimal.ZERO;
+        }
+        totalPnl = totalPnl.setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal totalNotional = tradeRepository.sumNotionalByUserIdAndDateRange(
+                userId,
+                cadToUsdRate,
+                startDate,
+                endDate
+        );
+        BigDecimal pnlPercent = computePnlPercent(totalPnl, totalNotional);
+
+        TradeRepository.MonthlyAggregateProjection monthProjection = tradeRepository.findBestMonthByUserIdAndDateRange(
+                userId,
+                cadToUsdRate,
+                startDate,
+                endDate
+        );
+        PnlBucketResponse bestMonth = toBestMonthBucket(monthProjection);
+
+        YearMonth scopedMonth = month != null
+                ? month
+                : bestMonth != null
+                        ? YearMonth.parse(bestMonth.period())
+                        : null;
+
+        PnlBucketResponse bestDay = null;
+        if (scopedMonth != null) {
+            LocalDate monthStart = scopedMonth.atDay(1);
+            LocalDate monthEnd = monthStart.plusMonths(1);
+            TradeRepository.DailyAggregateProjection dayProjection = tradeRepository.findBestDayByUserIdAndDateRange(
+                    userId,
+                    cadToUsdRate,
+                    monthStart,
+                    monthEnd
+            );
+            bestDay = toBestDayBucket(dayProjection);
+        }
+
+        return new AggregateStatsResponse(
+                totalPnl,
+                tradeCount,
+                pnlPercent,
+                bestDay,
+                bestMonth,
+                cadToUsdRate,
+                exchangeRateService.lastUpdatedOn(),
+                scopedYear,
+                scopedMonth != null ? scopedMonth.toString() : null
+        );
+    }
+
+    private int resolveScopedYear(String userId, Integer year, YearMonth month) {
+        if (month != null) {
+            return month.getYear();
+        }
+        if (year != null) {
+            return year;
+        }
+        LocalDate latestClosedAt = tradeRepository.findLatestClosedAtByUserId(userId);
+        if (latestClosedAt != null) {
+            return latestClosedAt.getYear();
+        }
+        return LocalDate.now().getYear();
+    }
+
+    private PnlBucketResponse toBestDayBucket(TradeRepository.DailyAggregateProjection projection) {
+        if (projection == null || projection.getPeriod() == null || projection.getPnl() == null) {
+            return null;
+        }
+        return new PnlBucketResponse(
+                projection.getPeriod().toString(),
+                projection.getPnl().setScale(2, RoundingMode.HALF_UP),
+                projection.getTrades(),
+                null
+        );
+    }
+
+    private PnlBucketResponse toBestMonthBucket(TradeRepository.MonthlyAggregateProjection projection) {
+        if (projection == null || projection.getPeriod() == null || projection.getPnl() == null) {
+            return null;
+        }
+        return new PnlBucketResponse(
+                projection.getPeriod(),
+                projection.getPnl().setScale(2, RoundingMode.HALF_UP),
+                projection.getTrades(),
+                null
         );
     }
 

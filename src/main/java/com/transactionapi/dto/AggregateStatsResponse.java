@@ -12,6 +12,8 @@ public record AggregateStatsResponse(
         PnlBucketResponse bestDay,
         PnlBucketResponse bestMonth,
         BigDecimal cadToUsdRate,
-        java.time.LocalDate fxDate
+        java.time.LocalDate fxDate,
+        Integer year,
+        String month
 ) {
 }

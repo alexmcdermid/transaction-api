@@ -112,6 +112,17 @@ public class TradeController {
         return tradeService.getAggregateStats(userId);
     }
 
+    @GetMapping("/stats/scoped")
+    public AggregateStatsResponse scopedStats(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String month
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getScopedAggregateStats(userId, year, parseMonth(month));
+    }
+
     private static java.time.YearMonth parseMonth(String value) {
         if (value == null || value.isBlank()) {
             return null;

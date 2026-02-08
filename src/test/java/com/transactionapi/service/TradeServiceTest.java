@@ -761,4 +761,198 @@ class TradeServiceTest {
         assertThat(stats.bestDay().pnl()).isEqualByComparingTo("200.00");
         assertThat(stats.bestDay().trades()).isEqualTo(3);
     }
+
+    @Test
+    void scopedAggregateStatsUsesOnlyRequestedYear() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "OLD",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2023, 12, 15),
+                        LocalDate.of(2023, 12, 15),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "NEW",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, null);
+
+        assertThat(scoped.year()).isEqualTo(2024);
+        assertThat(scoped.totalPnl()).isEqualByComparingTo("100.00");
+        assertThat(scoped.tradeCount()).isEqualTo(1);
+        assertThat(scoped.bestMonth()).isNotNull();
+        assertThat(scoped.bestMonth().period()).isEqualTo("2024-01");
+        assertThat(scoped.month()).isEqualTo("2024-01");
+        assertThat(scoped.bestDay()).isNotNull();
+        assertThat(scoped.bestDay().period()).isEqualTo("2024-01-10");
+    }
+
+    @Test
+    void scopedAggregateStatsDefaultsToMostRecentTradeYear() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "OLD",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2022, 6, 10),
+                        LocalDate.of(2022, 6, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "NEW-1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("105.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "NEW-2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("20.00"),
+                        new BigDecimal("27.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 5),
+                        LocalDate.of(2024, 3, 5),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, null, null);
+
+        assertThat(scoped.year()).isEqualTo(2024);
+        assertThat(scoped.totalPnl()).isEqualByComparingTo("120.00");
+        assertThat(scoped.tradeCount()).isEqualTo(2);
+        assertThat(scoped.bestMonth()).isNotNull();
+        assertThat(scoped.bestMonth().period()).isEqualTo("2024-03");
+        assertThat(scoped.month()).isEqualTo("2024-03");
+        assertThat(scoped.bestDay()).isNotNull();
+        assertThat(scoped.bestDay().period()).isEqualTo("2024-03-05");
+    }
+
+    @Test
+    void scopedAggregateStatsUsesRequestedMonthForBestDay() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "JAN",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-1",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("106.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 5),
+                        LocalDate.of(2024, 2, 5),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-2",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("20.00"),
+                        new BigDecimal("27.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 20),
+                        LocalDate.of(2024, 2, 20),
+                        null
+                ),
+                USER_ID
+        );
+
+        AggregateStatsResponse scoped = tradeService.getScopedAggregateStats(USER_ID, 2024, YearMonth.of(2024, 2));
+
+        assertThat(scoped.year()).isEqualTo(2024);
+        assertThat(scoped.month()).isEqualTo("2024-02");
+        assertThat(scoped.bestDay()).isNotNull();
+        assertThat(scoped.bestDay().period()).isEqualTo("2024-02-05");
+        assertThat(scoped.bestDay().pnl()).isEqualByComparingTo("60.00");
+    }
 }
