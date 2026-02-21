@@ -178,7 +178,8 @@ class ShareLinkServiceTest {
 
     @Test
     void getUserShareLinks_shouldReturnUserShares() {
-        when(shareLinkRepository.findByUserId("user1")).thenReturn(List.of(publicShare, authRequiredShare));
+        when(shareLinkRepository.findByUserIdOrderByCreatedAtDesc("user1"))
+                .thenReturn(List.of(publicShare, authRequiredShare));
 
         List<ShareLink> result = shareLinkService.getUserShareLinks("user1");
 

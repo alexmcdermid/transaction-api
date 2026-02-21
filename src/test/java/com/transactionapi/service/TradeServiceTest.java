@@ -12,10 +12,13 @@ import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
+import com.transactionapi.model.Account;
+import com.transactionapi.repository.AccountRepository;
 import com.transactionapi.repository.TradeRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,9 +39,13 @@ class TradeServiceTest {
     @Autowired
     private TradeRepository tradeRepository;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
     @BeforeEach
     void cleanDb() {
         tradeRepository.deleteAll();
+        accountRepository.deleteAll();
     }
 
     @Test
@@ -63,6 +70,130 @@ class TradeServiceTest {
         TradeResponse response = tradeService.createTrade(request, USER_ID);
 
         assertThat(response.realizedPnl()).isEqualByComparingTo("396.00");
+    }
+
+    @Test
+    void createsTradeWithoutAccountWhenAccountIsNotProvided() {
+        TradeRequest request = new TradeRequest(
+                "NVDA",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                1,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 5, 1),
+                LocalDate.of(2024, 5, 1),
+                null
+        );
+
+        TradeResponse response = tradeService.createTrade(request, USER_ID);
+
+        assertThat(response.accountId()).isNull();
+    }
+
+    @Test
+    void assignsAccountToTradeWhenOwnedByUser() {
+        Account account = new Account();
+        account.setUserId(USER_ID);
+        account.setName("Wealthsimple");
+        account.setDefaultStockFees(BigDecimal.ZERO);
+        account.setDefaultOptionFees(new BigDecimal("1.25"));
+        account.setDefaultMarginRateUsd(new BigDecimal("6.25"));
+        account.setDefaultMarginRateCad(new BigDecimal("6.25"));
+        Account savedAccount = accountRepository.save(account);
+
+        TradeRequest request = new TradeRequest(
+                "SHOP",
+                AssetType.STOCK,
+                Currency.CAD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("80.00"),
+                new BigDecimal("81.00"),
+                new BigDecimal("0.00"),
+                new BigDecimal("6.25"),
+                savedAccount.getId(),
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 8, 20),
+                LocalDate.of(2024, 8, 22),
+                null
+        );
+
+        TradeResponse response = tradeService.createTrade(request, USER_ID);
+
+        assertThat(response.accountId()).isEqualTo(savedAccount.getId());
+    }
+
+    @Test
+    void rejectsTradeWhenAccountBelongsToDifferentUser() {
+        Account account = new Account();
+        account.setUserId("different-user");
+        account.setName("Questrade");
+        account.setDefaultStockFees(new BigDecimal("0.99"));
+        account.setDefaultOptionFees(new BigDecimal("2.49"));
+        account.setDefaultMarginRateUsd(new BigDecimal("8.00"));
+        account.setDefaultMarginRateCad(new BigDecimal("8.00"));
+        Account savedAccount = accountRepository.save(account);
+
+        TradeRequest request = new TradeRequest(
+                "QQQ",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.SHORT,
+                3,
+                new BigDecimal("300.00"),
+                new BigDecimal("290.00"),
+                new BigDecimal("0.99"),
+                new BigDecimal("8.00"),
+                savedAccount.getId(),
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 9, 2),
+                LocalDate.of(2024, 9, 6),
+                null
+        );
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> tradeService.createTrade(request, USER_ID));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exception.getReason()).isEqualTo("Account not found");
+    }
+
+    @Test
+    void rejectsTradeWhenAccountDoesNotExist() {
+        TradeRequest request = new TradeRequest(
+                "TSLA",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                2,
+                new BigDecimal("200.00"),
+                new BigDecimal("210.00"),
+                BigDecimal.ZERO,
+                new BigDecimal("5.00"),
+                UUID.randomUUID(),
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 7, 1),
+                LocalDate.of(2024, 7, 2),
+                null
+        );
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> tradeService.createTrade(request, USER_ID));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exception.getReason()).isEqualTo("Account not found");
     }
 
     @Test

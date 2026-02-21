@@ -77,7 +77,7 @@ public class ShareLinkService {
     }
 
     public List<ShareLink> getUserShareLinks(String userId) {
-        return shareLinkRepository.findByUserId(userId);
+        return shareLinkRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
     public void deleteShareLink(String code, String userId) {

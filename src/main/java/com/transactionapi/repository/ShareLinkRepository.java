@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ShareLinkRepository extends JpaRepository<ShareLink, UUID> {
     Optional<ShareLink> findByCode(String code);
 
-    List<ShareLink> findByUserId(String userId);
+    List<ShareLink> findByUserIdOrderByCreatedAtDesc(String userId);
 
     @Transactional
     @Modifying

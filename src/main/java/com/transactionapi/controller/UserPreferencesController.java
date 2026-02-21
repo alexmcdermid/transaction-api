@@ -5,6 +5,7 @@ import com.transactionapi.dto.UserPreferencesRequest;
 import com.transactionapi.dto.UserPreferencesResponse;
 import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,10 +36,16 @@ public class UserPreferencesController {
 
     @PutMapping
     public UserPreferencesResponse updatePreferences(
-            @RequestBody UserPreferencesRequest request,
+            @Valid @RequestBody UserPreferencesRequest request,
             Authentication authentication
     ) {
-        if (request == null || (request.themeMode() == null && request.pnlDisplayMode() == null)) {
+        if (
+                request == null
+                        || (
+                                request.themeMode() == null
+                                && request.pnlDisplayMode() == null
+                        )
+        ) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one preference is required");
         }
         String userId = userIdResolver.requireUserId(authentication);
