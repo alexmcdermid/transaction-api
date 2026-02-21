@@ -10,6 +10,7 @@ import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
 import com.transactionapi.model.Trade;
+import com.transactionapi.repository.AccountRepository;
 import com.transactionapi.repository.TradeRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -39,24 +40,30 @@ public class TradeService {
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TradeRepository tradeRepository;
+    private final AccountRepository accountRepository;
     private final ExchangeRateService exchangeRateService;
 
-    public TradeService(TradeRepository tradeRepository, ExchangeRateService exchangeRateService) {
+    public TradeService(
+            TradeRepository tradeRepository,
+            AccountRepository accountRepository,
+            ExchangeRateService exchangeRateService
+    ) {
         this.tradeRepository = tradeRepository;
+        this.accountRepository = accountRepository;
         this.exchangeRateService = exchangeRateService;
     }
 
     public TradeResponse createTrade(TradeRequest request, String userId) {
         Trade trade = new Trade();
         trade.setUserId(userId);
-        applyRequest(trade, request);
+        applyRequest(trade, request, userId);
         return toResponse(tradeRepository.save(trade));
     }
 
     public TradeResponse updateTrade(@NonNull UUID tradeId, TradeRequest request, String userId) {
         Trade trade = tradeRepository.findByIdAndUserId(Objects.requireNonNull(tradeId), userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trade not found"));
-        applyRequest(trade, request);
+        applyRequest(trade, request, userId);
         return toResponse(tradeRepository.save(trade));
     }
 
@@ -337,7 +344,7 @@ public class TradeService {
         );
     }
 
-    private void applyRequest(Trade trade, TradeRequest request) {
+    private void applyRequest(Trade trade, TradeRequest request, String userId) {
         if (request.assetType() == AssetType.OPTION) {
             if (request.optionType() == null || request.strikePrice() == null || request.expiryDate() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Options require type, strike, and expiry");
@@ -356,6 +363,13 @@ public class TradeService {
         trade.setExitPrice(request.exitPrice());
         trade.setFees(request.fees() != null ? request.fees() : BigDecimal.ZERO);
         trade.setMarginRate(request.marginRate() != null ? request.marginRate() : BigDecimal.ZERO);
+        if (request.accountId() != null) {
+            accountRepository.findByIdAndUserId(request.accountId(), userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account not found"));
+            trade.setAccountId(request.accountId());
+        } else {
+            trade.setAccountId(null);
+        }
         if (request.assetType() == AssetType.OPTION) {
             trade.setOptionType(request.optionType());
             trade.setStrikePrice(request.strikePrice());
@@ -478,6 +492,7 @@ public class TradeService {
                 trade.getExitPrice(),
                 trade.getFees(),
                 trade.getMarginRate(),
+                trade.getAccountId(),
                 trade.getOptionType(),
                 trade.getStrikePrice(),
                 trade.getExpiryDate(),

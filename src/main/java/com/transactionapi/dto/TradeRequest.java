@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public record TradeRequest(
         @NotBlank @Size(max = 12) String symbol,
@@ -22,6 +23,7 @@ public record TradeRequest(
         @NotNull @DecimalMin("0.00") BigDecimal exitPrice,
         @DecimalMin("0.00") BigDecimal fees,
         @DecimalMin("0.00") BigDecimal marginRate,
+        UUID accountId,
         OptionType optionType,
         BigDecimal strikePrice,
         LocalDate expiryDate,
@@ -29,6 +31,43 @@ public record TradeRequest(
         @NotNull LocalDate closedAt,
         @Size(max = 500) String notes
 ) {
+    public TradeRequest(
+            String symbol,
+            AssetType assetType,
+            Currency currency,
+            TradeDirection direction,
+            Integer quantity,
+            BigDecimal entryPrice,
+            BigDecimal exitPrice,
+            BigDecimal fees,
+            UUID accountId,
+            OptionType optionType,
+            BigDecimal strikePrice,
+            LocalDate expiryDate,
+            LocalDate openedAt,
+            LocalDate closedAt,
+            String notes
+    ) {
+        this(
+                symbol,
+                assetType,
+                currency,
+                direction,
+                quantity,
+                entryPrice,
+                exitPrice,
+                fees,
+                null,
+                accountId,
+                optionType,
+                strikePrice,
+                expiryDate,
+                openedAt,
+                closedAt,
+                notes
+        );
+    }
+
     public TradeRequest(
             String symbol,
             AssetType assetType,
@@ -54,6 +93,7 @@ public record TradeRequest(
                 entryPrice,
                 exitPrice,
                 fees,
+                null,
                 null,
                 optionType,
                 strikePrice,

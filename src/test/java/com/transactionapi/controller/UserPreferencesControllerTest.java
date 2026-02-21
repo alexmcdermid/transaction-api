@@ -63,7 +63,7 @@ class UserPreferencesControllerTest {
     }
 
     @Test
-    void rejectsMissingThemeMode() throws Exception {
+    void rejectsMissingPreferencesPayload() throws Exception {
         mockMvc.perform(
                         put(ApiPaths.USER_PREFERENCES)
                                 .contentType(MediaType.APPLICATION_JSON)

@@ -63,6 +63,9 @@ public class Trade {
     @Column(name = "margin_rate", precision = 8, scale = 4, nullable = false)
     private BigDecimal marginRate = BigDecimal.ZERO;
 
+    @Column(name = "account_id")
+    private UUID accountId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "option_type", length = 10)
     private OptionType optionType;
@@ -186,6 +189,14 @@ public class Trade {
 
     public void setMarginRate(BigDecimal marginRate) {
         this.marginRate = marginRate;
+    }
+
+    public UUID getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(UUID accountId) {
+        this.accountId = accountId;
     }
 
     public OptionType getOptionType() {
