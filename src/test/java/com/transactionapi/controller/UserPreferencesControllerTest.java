@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.UserPreferencesRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,12 +39,19 @@ class UserPreferencesControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.themeMode").value("LIGHT"))
-                .andExpect(jsonPath("$.pnlDisplayMode").value("PNL"));
+                .andExpect(jsonPath("$.pnlDisplayMode").value("PNL"))
+                .andExpect(jsonPath("$.defaultTradeSortBy").value("CLOSED_AT"))
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("DESC"));
     }
 
     @Test
     void updatesAndReturnsThemePreference() throws Exception {
-        UserPreferencesRequest request = new UserPreferencesRequest(ThemeMode.DARK, PnlDisplayMode.PERCENT);
+        UserPreferencesRequest request = new UserPreferencesRequest(
+                ThemeMode.DARK,
+                PnlDisplayMode.PERCENT,
+                TradeSortField.SYMBOL,
+                TradeSortDirection.ASC
+        );
 
         mockMvc.perform(
                         put(ApiPaths.USER_PREFERENCES)
@@ -51,7 +60,9 @@ class UserPreferencesControllerTest {
                                 .content(objectMapper.writeValueAsString(request))
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.themeMode").value("DARK"));
+                .andExpect(jsonPath("$.themeMode").value("DARK"))
+                .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"));
 
         mockMvc.perform(
                         get(ApiPaths.USER_PREFERENCES)
@@ -59,7 +70,9 @@ class UserPreferencesControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.themeMode").value("DARK"))
-                .andExpect(jsonPath("$.pnlDisplayMode").value("PERCENT"));
+                .andExpect(jsonPath("$.pnlDisplayMode").value("PERCENT"))
+                .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"));
     }
 
     @Test

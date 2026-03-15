@@ -3,6 +3,8 @@ package com.transactionapi.service;
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -68,11 +71,11 @@ public class TradeService {
     }
 
     public PagedResponse<TradeResponse> listTrades(String userId, int page, int size) {
-        return listTrades(userId, page, size, null);
+        return listTrades(userId, page, size, null, null, null, null);
     }
 
     public PagedResponse<TradeResponse> listTrades(String userId, int page, int size, YearMonth month) {
-        return listTrades(userId, page, size, month, null);
+        return listTrades(userId, page, size, month, null, null, null);
     }
 
     public PagedResponse<TradeResponse> listTrades(
@@ -82,17 +85,30 @@ public class TradeService {
             YearMonth month,
             LocalDate day
     ) {
+        return listTrades(userId, page, size, month, day, null, null);
+    }
+
+    public PagedResponse<TradeResponse> listTrades(
+            String userId,
+            int page,
+            int size,
+            YearMonth month,
+            LocalDate day,
+            TradeSortField sortBy,
+            TradeSortDirection sortDirection
+    ) {
         int boundedSize = Math.min(Math.max(size, 1), 100);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), boundedSize);
+        Sort sort = buildSort(sortBy, sortDirection);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), boundedSize, sort);
         Page<Trade> result;
         if (day != null) {
-            result = tradeRepository.findByUserIdAndClosedAtOrderByClosedAtDesc(userId, day, pageable);
+            result = tradeRepository.findByUserIdAndClosedAt(userId, day, pageable);
         } else if (month != null) {
             LocalDate start = month.atDay(1);
             LocalDate end = month.atEndOfMonth();
-            result = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(userId, start, end, pageable);
+            result = tradeRepository.findByUserIdAndClosedAtBetween(userId, start, end, pageable);
         } else {
-            result = tradeRepository.findByUserIdOrderByClosedAtDesc(userId, pageable);
+            result = tradeRepository.findByUserId(userId, pageable);
         }
         List<TradeResponse> items = result.getContent().stream()
                 .map(this::toResponse)
@@ -106,6 +122,24 @@ public class TradeService {
                 result.hasNext(),
                 result.hasPrevious()
         );
+    }
+
+    private Sort buildSort(TradeSortField requestedField, TradeSortDirection requestedDirection) {
+        TradeSortField sortField = requestedField != null ? requestedField : TradeSortField.defaultValue();
+        TradeSortDirection sortDirection = requestedDirection != null
+                ? requestedDirection
+                : TradeSortDirection.defaultValue();
+        Sort.Direction primaryDirection = sortDirection.toSpringDirection();
+        Sort sort = Sort.by(primaryDirection, sortField.propertyName());
+        if (sortField == TradeSortField.CLOSED_AT) {
+            return sort.and(Sort.by(primaryDirection, TradeSortField.CREATED_AT.propertyName()));
+        }
+        if (sortField == TradeSortField.CREATED_AT) {
+            return sort.and(Sort.by(Sort.Direction.DESC, TradeSortField.CLOSED_AT.propertyName()));
+        }
+        return sort
+                .and(Sort.by(Sort.Direction.DESC, TradeSortField.CLOSED_AT.propertyName()))
+                .and(Sort.by(Sort.Direction.DESC, TradeSortField.CREATED_AT.propertyName()));
     }
 
     public void deleteTrade(@NonNull UUID tradeId, String userId) {

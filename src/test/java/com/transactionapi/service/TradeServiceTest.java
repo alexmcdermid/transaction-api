@@ -7,6 +7,8 @@ import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
@@ -378,6 +380,80 @@ class TradeServiceTest {
         assertThat(pageTwo.items().getFirst().symbol()).isEqualTo("AAA");
         assertThat(pageTwo.hasNext()).isFalse();
         assertThat(pageTwo.hasPrevious()).isTrue();
+    }
+
+    @Test
+    void paginatesTradesUsingRequestedSortOrder() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 12),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "TSLA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 11),
+                        null
+                ),
+                USER_ID
+        );
+
+        PagedResponse<TradeResponse> sorted = tradeService.listTrades(
+                USER_ID,
+                0,
+                5,
+                null,
+                null,
+                TradeSortField.SYMBOL,
+                TradeSortDirection.ASC
+        );
+
+        assertThat(sorted.items()).extracting(TradeResponse::symbol)
+                .containsExactly("AAPL", "MSFT", "TSLA");
     }
 
     @Test

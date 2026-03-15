@@ -2,6 +2,8 @@ package com.transactionapi.model;
 
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,6 +43,14 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "pnl_display_mode", length = 16)
     private PnlDisplayMode pnlDisplayMode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_trade_sort_by", length = 32)
+    private TradeSortField defaultTradeSortBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_trade_sort_direction", length = 8)
+    private TradeSortDirection defaultTradeSortDirection;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -102,6 +112,22 @@ public class User {
 
     public void setPnlDisplayMode(PnlDisplayMode pnlDisplayMode) {
         this.pnlDisplayMode = pnlDisplayMode;
+    }
+
+    public TradeSortField getDefaultTradeSortBy() {
+        return defaultTradeSortBy;
+    }
+
+    public void setDefaultTradeSortBy(TradeSortField defaultTradeSortBy) {
+        this.defaultTradeSortBy = defaultTradeSortBy;
+    }
+
+    public TradeSortDirection getDefaultTradeSortDirection() {
+        return defaultTradeSortDirection;
+    }
+
+    public void setDefaultTradeSortDirection(TradeSortDirection defaultTradeSortDirection) {
+        this.defaultTradeSortDirection = defaultTradeSortDirection;
     }
 
     public Instant getCreatedAt() {
