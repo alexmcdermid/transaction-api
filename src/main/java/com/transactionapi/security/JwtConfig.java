@@ -53,7 +53,7 @@ public class JwtConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(value = "app.security.jwt.enabled", havingValue = "true")
+    @ConditionalOnProperty(value = "app.security.jwt.enabled", havingValue = "true", matchIfMissing = true)
     public JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder;
         if (StringUtils.hasText(jwkSetJson)) {
@@ -69,7 +69,11 @@ public class JwtConfig {
                 throw new IllegalStateException("JWT JWK source is 'dynamo' but no usable JWK set JSON was found");
             }
             decoder = buildDecoderFromJwkSet(dynamoJwkSetJson);
-        } else if ("jwk-set-uri".equalsIgnoreCase(jwkSource) && StringUtils.hasText(jwkSetUri)) {
+        } else if ("jwk-set-uri".equalsIgnoreCase(jwkSource)) {
+            if (!StringUtils.hasText(jwkSetUri)) {
+                throw new IllegalStateException(
+                        "app.security.jwt.jwk-source is 'jwk-set-uri' but app.security.jwt.jwk-set-uri is not configured");
+            }
             log.info("Configuring JWT decoder from JWK set URI {}", jwkSetUri);
             decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         } else {

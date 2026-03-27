@@ -73,7 +73,7 @@ public class SecurityConfig {
         if (allowHeaderAuth) {
             http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         }
-        http.addFilterAfter(rateLimitingFilter, HeaderUserAuthenticationFilter.class);
+        http.addFilterAfter(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
