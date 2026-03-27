@@ -65,6 +65,37 @@ class UserIdResolverTest {
         verify(userService, never()).ensureUserExists(anyString(), anyString());
     }
 
+    @Test
+    void resolveEmail_returnsNullWhenEmailVerifiedIsFalse() {
+        configureAllowlist("");
+        JwtAuthenticationToken auth = buildAuthWithEmailVerified("sub-unverified", "unverified@example.com", false);
+
+        String email = userIdResolver.resolveEmail(auth);
+
+        assertThat(email).isNull();
+    }
+
+    @Test
+    void resolveEmail_returnsEmailWhenEmailVerifiedIsTrue() {
+        configureAllowlist("");
+        JwtAuthenticationToken auth = buildAuthWithEmailVerified("sub-verified", "verified@example.com", true);
+
+        String email = userIdResolver.resolveEmail(auth);
+
+        assertThat(email).isEqualTo("verified@example.com");
+    }
+
+    @Test
+    void resolveEmail_returnsEmailWhenEmailVerifiedClaimAbsent() {
+        // Some future providers may omit the claim entirely; we don't block them
+        configureAllowlist("");
+        JwtAuthenticationToken auth = buildAuth("sub-noverified", "noverified@example.com");
+
+        String email = userIdResolver.resolveEmail(auth);
+
+        assertThat(email).isEqualTo("noverified@example.com");
+    }
+
     private void configureAllowlist(String allowed) {
         ReflectionTestUtils.setField(userIdResolver, "allowedEmails", allowed);
         ReflectionTestUtils.setField(userIdResolver, "adminEmails", "");
@@ -76,6 +107,16 @@ class UserIdResolverTest {
                 .header("alg", "none")
                 .subject(subject)
                 .claim("email", email)
+                .build();
+        return new JwtAuthenticationToken(jwt);
+    }
+
+    private JwtAuthenticationToken buildAuthWithEmailVerified(String subject, String email, boolean emailVerified) {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .subject(subject)
+                .claim("email", email)
+                .claim("email_verified", emailVerified)
                 .build();
         return new JwtAuthenticationToken(jwt);
     }

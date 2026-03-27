@@ -66,6 +66,26 @@ Set the following properties:
 
 Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
 
+### JWT Key Sources (for VPC/no-NAT setups)
+- `app.security.jwt.jwk-source=issuer` (default) — uses OIDC issuer discovery/JWKS over the internet
+- `app.security.jwt.jwk-source=dynamo` — reads a JWKS JSON blob from DynamoDB (for App Runner in VPC without NAT)
+- `app.security.jwt.jwk-source=jwk-set-uri` — fetches JWKS from a direct URI (requires internet)
+- `app.security.jwt.jwk-set` — optional inline JWKS JSON override (highest priority; no network fetch)
+
+If using `dynamo`, configure:
+- `app.aws.region`
+- `app.security.jwt.dynamo.table` (default `AuthJwks`)
+- `app.security.jwt.dynamo.key-name` (default `issuer`)
+- `app.security.jwt.dynamo.jwk-set-attribute` (default `jwkSet`)
+
+Default Dynamo item shape:
+```json
+{
+  "issuer": "https://accounts.google.com",
+  "jwkSet": "{\"keys\":[...]}"
+}
+```
+
 ### Admin Access
 - `app.security.admin-emails` (comma-separated list)
 - If unset, the admin list falls back to `app.security.allowed-emails`
@@ -91,7 +111,12 @@ Required:
 Optional:
 - `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
 - `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
+- `APP_SECURITY_JWT_JWK_SOURCE` (`issuer`, `dynamo`, or `jwk-set-uri`)
 - `APP_SECURITY_JWT_JWK_SET` (pin JWKS JSON)
+- `APP_SECURITY_JWT_JWK_SET_URI` (used when `APP_SECURITY_JWT_JWK_SOURCE=jwk-set-uri`)
+- `APP_SECURITY_JWT_DYNAMO_TABLE` (used when `APP_SECURITY_JWT_JWK_SOURCE=dynamo`)
+- `APP_SECURITY_JWT_DYNAMO_KEY_NAME` (defaults to `issuer`)
+- `APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE` (defaults to `jwkSet`)
 
 ## CI/CD (GitHub Actions)
 
@@ -133,6 +158,12 @@ Role permissions for App Runner deploys must include:
 - **App Runner:** reads the latest CAD/USD rate from DynamoDB on startup + daily schedule.
 - **Local:** uses the direct BoC/CBSA HTTP call for quick debugging.
 - **Why DynamoDB:** stable, low-cost, VPC-friendly via a DynamoDB gateway endpoint.
+
+### JWT Keys (Google/Neon OIDC -> DynamoDB mirror -> App Runner)
+- **Goal:** validate JWTs in App Runner (VPC) without NAT/public internet egress.
+- **Flow:** Lambda/cron (outside VPC) fetches OIDC JWKS (Google or Neon Auth), writes the latest JWKS JSON to DynamoDB.
+- **App Runner:** `app.security.jwt.jwk-source=dynamo` reads the JWKS JSON from DynamoDB on startup and validates tokens locally.
+- **Local:** keep `app.security.jwt.jwk-source=issuer` for simplicity.
 
 ### Performance Optimizations
 - **Aggregate Stats Endpoint** (`/api/v1/trades/stats`) uses database-level aggregation with native SQL queries for O(1) memory usage

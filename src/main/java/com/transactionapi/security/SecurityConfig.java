@@ -29,8 +29,11 @@ public class SecurityConfig {
     private final HeaderUserAuthenticationFilter headerUserAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
 
-    @Value("${app.security.jwt.enabled:false}")
+    @Value("${app.security.jwt.enabled:true}")
     private boolean jwtEnabled;
+
+    @Value("${app.security.allow-header-auth:false}")
+    private boolean allowHeaderAuth;
 
     @Value("${app.cors.allowed-origins:}")
     private String[] allowedOrigins;
@@ -67,8 +70,10 @@ public class SecurityConfig {
             });
             http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)));
         }
-        http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        http.addFilterAfter(rateLimitingFilter, HeaderUserAuthenticationFilter.class);
+        if (allowHeaderAuth) {
+            http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterAfter(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
