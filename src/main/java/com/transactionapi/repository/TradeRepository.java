@@ -17,16 +17,16 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
     @Query("select t from Trade t where t.userId = :userId order by t.closedAt desc, t.createdAt desc")
     List<Trade> findAllForUser(@Param("userId") String userId);
 
-    Page<Trade> findByUserIdOrderByClosedAtDesc(String userId, Pageable pageable);
+    Page<Trade> findByUserId(String userId, Pageable pageable);
 
-    Page<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(
+    Page<Trade> findByUserIdAndClosedAtBetween(
             String userId,
             LocalDate start,
             LocalDate end,
             Pageable pageable
     );
 
-    Page<Trade> findByUserIdAndClosedAtOrderByClosedAtDesc(
+    Page<Trade> findByUserIdAndClosedAt(
             String userId,
             LocalDate closedAt,
             Pageable pageable

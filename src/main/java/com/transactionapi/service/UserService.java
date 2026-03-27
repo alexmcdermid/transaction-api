@@ -2,6 +2,8 @@ package com.transactionapi.service;
 
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.model.User;
 import com.transactionapi.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,9 @@ public class UserService {
             String authId,
             String email,
             ThemeMode themeMode,
-            PnlDisplayMode pnlDisplayMode
+            PnlDisplayMode pnlDisplayMode,
+            TradeSortField defaultTradeSortBy,
+            TradeSortDirection defaultTradeSortDirection
     ) {
         User user = getOrCreateUser(authId, email);
         if (themeMode != null) {
@@ -50,6 +54,12 @@ public class UserService {
         }
         if (pnlDisplayMode != null) {
             user.setPnlDisplayMode(pnlDisplayMode);
+        }
+        if (defaultTradeSortBy != null) {
+            user.setDefaultTradeSortBy(defaultTradeSortBy);
+        }
+        if (defaultTradeSortDirection != null) {
+            user.setDefaultTradeSortDirection(defaultTradeSortDirection);
         }
         return userRepository.save(user);
     }

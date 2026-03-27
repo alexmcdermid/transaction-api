@@ -44,6 +44,8 @@ public class UserPreferencesController {
                         || (
                                 request.themeMode() == null
                                 && request.pnlDisplayMode() == null
+                                && request.defaultTradeSortBy() == null
+                                && request.defaultTradeSortDirection() == null
                         )
         ) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one preference is required");
@@ -55,7 +57,9 @@ public class UserPreferencesController {
                         userId,
                         email,
                         request.themeMode(),
-                        request.pnlDisplayMode()
+                        request.pnlDisplayMode(),
+                        request.defaultTradeSortBy(),
+                        request.defaultTradeSortDirection()
                 )
         );
     }

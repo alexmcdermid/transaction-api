@@ -1,6 +1,8 @@
 package com.transactionapi.controller;
 
 import com.transactionapi.constants.ApiPaths;
+import com.transactionapi.constants.TradeSortDirection;
+import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
@@ -66,11 +68,21 @@ public class TradeController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String month,
-            @RequestParam(required = false) String date
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDirection
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.listTrades(userId, page, size, parseMonth(month), parseDate(date));
+        return tradeService.listTrades(
+                userId,
+                page,
+                size,
+                parseMonth(month),
+                parseDate(date),
+                parseSortBy(sortBy),
+                parseSortDirection(sortDirection)
+        );
     }
 
     @PutMapping("/{tradeId}")
@@ -153,6 +165,34 @@ public class TradeController {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Invalid date format, expected YYYY-MM-DD"
+            );
+        }
+    }
+
+    private static TradeSortField parseSortBy(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return TradeSortField.fromValue(value);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid sortBy value"
+            );
+        }
+    }
+
+    private static TradeSortDirection parseSortDirection(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return TradeSortDirection.fromValue(value);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid sortDirection value"
             );
         }
     }
