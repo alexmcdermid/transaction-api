@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,6 +31,17 @@ public class RateLimiterService {
 
     public boolean allowPublicShare(String ipAddress) {
         return allowWithLimit("ip:" + ipAddress, maxPublicShareRequests);
+    }
+
+    /** Evict buckets that have had no activity within the last window. Runs every 5 minutes. */
+    @Scheduled(fixedDelay = 300_000)
+    public void evictStaleBuckets() {
+        long cutoff = System.currentTimeMillis() - windowMillis;
+        buckets.entrySet().removeIf(entry -> {
+            ConcurrentLinkedDeque<Long> deque = entry.getValue();
+            Long last = deque.peekLast();
+            return last == null || last < cutoff;
+        });
     }
 
     private boolean allowWithLimit(String key, int limit) {

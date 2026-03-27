@@ -95,7 +95,13 @@ public class UserIdResolver {
 
     public String resolveEmail(Authentication authentication) {
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getClaimAsString("email");
+            Jwt jwt = jwtAuth.getToken();
+            // Only trust email claims that Google has verified
+            Boolean emailVerified = jwt.getClaimAsBoolean("email_verified");
+            if (Boolean.FALSE.equals(emailVerified)) {
+                return null;
+            }
+            return jwt.getClaimAsString("email");
         }
         if (authentication != null && authentication.getPrincipal() instanceof String principal) {
             if (principal.contains("@")) {
