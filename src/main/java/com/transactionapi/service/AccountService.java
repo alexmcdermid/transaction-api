@@ -44,6 +44,25 @@ public class AccountService {
         return accountRepository.save(account);
     }
 
+    public Account updateAccount(String userId, UUID accountId, AccountRequest request) {
+        Account account = accountRepository.findByIdAndUserId(accountId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        account.setName(request.name().trim());
+        account.setDefaultStockFees(
+                request.defaultStockFees() != null ? request.defaultStockFees() : BigDecimal.ZERO
+        );
+        account.setDefaultOptionFees(
+                request.defaultOptionFees() != null ? request.defaultOptionFees() : BigDecimal.ZERO
+        );
+        account.setDefaultMarginRateUsd(
+                request.defaultMarginRateUsd() != null ? request.defaultMarginRateUsd() : BigDecimal.ZERO
+        );
+        account.setDefaultMarginRateCad(
+                request.defaultMarginRateCad() != null ? request.defaultMarginRateCad() : BigDecimal.ZERO
+        );
+        return accountRepository.save(account);
+    }
+
     public void deleteAccount(String userId, UUID accountId) {
         Account account = accountRepository.findByIdAndUserId(accountId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));

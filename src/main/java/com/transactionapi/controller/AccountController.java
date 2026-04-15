@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,6 +52,17 @@ public class AccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 AccountResponse.from(accountService.createAccount(userId, request))
         );
+    }
+
+    @PutMapping("/{accountId}")
+    public ResponseEntity<AccountResponse> updateAccount(
+            Authentication authentication,
+            @PathVariable UUID accountId,
+            @Valid @RequestBody AccountRequest request
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return ResponseEntity.ok(AccountResponse.from(accountService.updateAccount(userId, accountId, request)));
     }
 
     @DeleteMapping("/{accountId}")
