@@ -170,7 +170,14 @@ public class TradeService {
                     BigDecimal dayPnl = sumPnl(entry.getValue(), cadToUsdRate);
                     BigDecimal dayNotional = sumNotional(entry.getValue(), cadToUsdRate);
                     BigDecimal dayPercent = computePnlPercent(dayPnl, dayNotional);
-                    return new PnlBucketResponse(entry.getKey().toString(), dayPnl, entry.getValue().size(), dayPercent);
+                    BigDecimal dayMarginFee = sumMarginFees(entry.getValue(), cadToUsdRate);
+                    return new PnlBucketResponse(
+                            entry.getKey().toString(),
+                            dayPnl,
+                            entry.getValue().size(),
+                            dayPercent,
+                            dayMarginFee
+                    );
                 })
                 .toList();
 
@@ -182,7 +189,14 @@ public class TradeService {
                     BigDecimal monthPnl = sumPnl(entry.getValue(), cadToUsdRate);
                     BigDecimal monthNotional = sumNotional(entry.getValue(), cadToUsdRate);
                     BigDecimal monthPercent = computePnlPercent(monthPnl, monthNotional);
-                    return new PnlBucketResponse(entry.getKey().toString(), monthPnl, entry.getValue().size(), monthPercent);
+                    BigDecimal monthMarginFee = sumMarginFees(entry.getValue(), cadToUsdRate);
+                    return new PnlBucketResponse(
+                            entry.getKey().toString(),
+                            monthPnl,
+                            entry.getValue().size(),
+                            monthPercent,
+                            monthMarginFee
+                    );
                 })
                 .toList();
 
@@ -225,6 +239,7 @@ public class TradeService {
                         bestDayProj.getPeriod().toString(),
                         pnl.setScale(2, RoundingMode.HALF_UP),
                         bestDayProj.getTrades(),
+                        null,
                         null
                 );
             }
@@ -240,6 +255,7 @@ public class TradeService {
                         monthProj.getPeriod(),
                         pnl.setScale(2, RoundingMode.HALF_UP),
                         monthProj.getTrades(),
+                        null,
                         null
                 );
             }
@@ -362,6 +378,7 @@ public class TradeService {
                 projection.getPeriod().toString(),
                 projection.getPnl().setScale(2, RoundingMode.HALF_UP),
                 projection.getTrades(),
+                null,
                 null
         );
     }
@@ -374,6 +391,7 @@ public class TradeService {
                 projection.getPeriod(),
                 projection.getPnl().setScale(2, RoundingMode.HALF_UP),
                 projection.getTrades(),
+                null,
                 null
         );
     }
@@ -469,10 +487,25 @@ public class TradeService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    private BigDecimal sumMarginFees(List<Trade> trades, BigDecimal cadToUsdRate) {
+        return trades.stream()
+                .map(trade -> toUsdMarginFee(trade, cadToUsdRate))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
     private BigDecimal toUsd(Trade trade, BigDecimal cadToUsdRate) {
         Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
         BigDecimal rate = currency == Currency.CAD ? cadToUsdRate : BigDecimal.ONE;
         return trade.getRealizedPnl().multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal toUsdMarginFee(Trade trade, BigDecimal cadToUsdRate) {
+        BigDecimal marginFee = calculateMarginFee(trade);
+        Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
+        BigDecimal rate = currency == Currency.CAD ? cadToUsdRate : BigDecimal.ONE;
+        return marginFee.multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal toUsdNotional(Trade trade, BigDecimal cadToUsdRate) {

@@ -310,6 +310,39 @@ class TradeServiceTest {
     }
 
     @Test
+    void summaryBucketsIncludeMarginFees() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("36.50"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 1),
+                        LocalDate.of(2024, 1, 11),
+                        null
+                ),
+                USER_ID
+        );
+
+        PnlSummaryResponse summary = tradeService.summarize(USER_ID, YearMonth.of(2024, 1));
+
+        assertThat(summary.totalPnl()).isEqualByComparingTo("90.00");
+        assertThat(summary.daily()).singleElement()
+                .satisfies(bucket -> assertThat(bucket.marginFee()).isEqualByComparingTo("10.00"));
+        assertThat(summary.monthly()).singleElement()
+                .satisfies(bucket -> assertThat(bucket.marginFee()).isEqualByComparingTo("10.00"));
+    }
+
+    @Test
     void paginatesTradesDescendingByCloseDate() {
         tradeService.createTrade(
                 new TradeRequest(
