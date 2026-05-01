@@ -6,6 +6,7 @@ public record PnlBucketResponse(
         String period,
         BigDecimal pnl,
         int trades,
-        BigDecimal pnlPercent
+        BigDecimal pnlPercent,
+        BigDecimal marginFee
 ) {
 }
