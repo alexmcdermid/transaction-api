@@ -41,7 +41,8 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.themeMode").value("LIGHT"))
                 .andExpect(jsonPath("$.pnlDisplayMode").value("PNL"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("CLOSED_AT"))
-                .andExpect(jsonPath("$.defaultTradeSortDirection").value("DESC"));
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("DESC"))
+                .andExpect(jsonPath("$.showTradeHistory").value(false));
     }
 
     @Test
@@ -50,7 +51,8 @@ class UserPreferencesControllerTest {
                 ThemeMode.DARK,
                 PnlDisplayMode.PERCENT,
                 TradeSortField.SYMBOL,
-                TradeSortDirection.ASC
+                TradeSortDirection.ASC,
+                true
         );
 
         mockMvc.perform(
@@ -62,7 +64,8 @@ class UserPreferencesControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.themeMode").value("DARK"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
-                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"));
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
+                .andExpect(jsonPath("$.showTradeHistory").value(true));
 
         mockMvc.perform(
                         get(ApiPaths.USER_PREFERENCES)
@@ -72,7 +75,8 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.themeMode").value("DARK"))
                 .andExpect(jsonPath("$.pnlDisplayMode").value("PERCENT"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
-                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"));
+                .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
+                .andExpect(jsonPath("$.showTradeHistory").value(true));
     }
 
     @Test

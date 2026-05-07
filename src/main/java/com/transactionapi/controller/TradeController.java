@@ -6,6 +6,7 @@ import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
 import com.transactionapi.security.UserIdResolver;
@@ -94,6 +95,13 @@ public class TradeController {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.updateTrade(tradeId, request, userId);
+    }
+
+    @GetMapping("/{tradeId}/history")
+    public List<TradeHistoryResponse> history(Authentication authentication, @PathVariable UUID tradeId) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.listTradeHistory(tradeId, userId);
     }
 
     @DeleteMapping("/{tradeId}")

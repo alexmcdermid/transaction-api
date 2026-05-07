@@ -46,7 +46,8 @@ public class UserService {
             ThemeMode themeMode,
             PnlDisplayMode pnlDisplayMode,
             TradeSortField defaultTradeSortBy,
-            TradeSortDirection defaultTradeSortDirection
+            TradeSortDirection defaultTradeSortDirection,
+            Boolean showTradeHistory
     ) {
         User user = getOrCreateUser(authId, email);
         if (themeMode != null) {
@@ -60,6 +61,9 @@ public class UserService {
         }
         if (defaultTradeSortDirection != null) {
             user.setDefaultTradeSortDirection(defaultTradeSortDirection);
+        }
+        if (showTradeHistory != null) {
+            user.setShowTradeHistory(showTradeHistory);
         }
         return userRepository.save(user);
     }

@@ -52,6 +52,9 @@ public class User {
     @Column(name = "default_trade_sort_direction", length = 8)
     private TradeSortDirection defaultTradeSortDirection;
 
+    @Column(name = "show_trade_history", nullable = false)
+    private boolean showTradeHistory = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -128,6 +131,14 @@ public class User {
 
     public void setDefaultTradeSortDirection(TradeSortDirection defaultTradeSortDirection) {
         this.defaultTradeSortDirection = defaultTradeSortDirection;
+    }
+
+    public boolean isShowTradeHistory() {
+        return showTradeHistory;
+    }
+
+    public void setShowTradeHistory(boolean showTradeHistory) {
+        this.showTradeHistory = showTradeHistory;
     }
 
     public Instant getCreatedAt() {

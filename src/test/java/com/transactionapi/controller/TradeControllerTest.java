@@ -537,4 +537,83 @@ class TradeControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(id));
     }
+
+    @Test
+    void returnsHistoryForUsersOwnTradeOnly() throws Exception {
+        String owner = "history-owner";
+        String other = "history-other";
+        TradeRequest create = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 10),
+                LocalDate.of(2024, 1, 10),
+                null
+        );
+        TradeRequest edit = new TradeRequest(
+                "MSFT",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.SHORT,
+                5,
+                new BigDecimal("50.00"),
+                new BigDecimal("45.00"),
+                new BigDecimal("1.00"),
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 11),
+                LocalDate.of(2024, 1, 11),
+                "edited"
+        );
+
+        String id = objectMapper.readTree(
+                        mockMvc.perform(
+                                        post(ApiPaths.TRADES)
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .header("X-User-Id", owner)
+                                                .content(objectMapper.writeValueAsString(create))
+                                )
+                                .andExpect(status().isCreated())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString()
+                )
+                .get("id")
+                .asText();
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/" + id)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", owner)
+                                .content(objectMapper.writeValueAsString(edit))
+                )
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/" + id + "/history")
+                                .header("X-User-Id", owner)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].action").value("CREATE"))
+                .andExpect(jsonPath("$[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$[1].action").value("EDIT"))
+                .andExpect(jsonPath("$[1].symbol").value("MSFT"));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/" + id + "/history")
+                                .header("X-User-Id", other)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
 }
