@@ -9,6 +9,7 @@ public record UserPreferencesRequest(
         ThemeMode themeMode,
         PnlDisplayMode pnlDisplayMode,
         TradeSortField defaultTradeSortBy,
-        TradeSortDirection defaultTradeSortDirection
+        TradeSortDirection defaultTradeSortDirection,
+        Boolean showTradeHistory
 ) {
 }

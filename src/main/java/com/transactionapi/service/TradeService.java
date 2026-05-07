@@ -3,16 +3,20 @@ package com.transactionapi.service;
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.constants.TradeHistoryAction;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
 import com.transactionapi.model.Trade;
+import com.transactionapi.model.TradeHistory;
 import com.transactionapi.repository.AccountRepository;
+import com.transactionapi.repository.TradeHistoryRepository;
 import com.transactionapi.repository.TradeRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,15 +47,18 @@ public class TradeService {
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TradeRepository tradeRepository;
+    private final TradeHistoryRepository tradeHistoryRepository;
     private final AccountRepository accountRepository;
     private final ExchangeRateService exchangeRateService;
 
     public TradeService(
             TradeRepository tradeRepository,
+            TradeHistoryRepository tradeHistoryRepository,
             AccountRepository accountRepository,
             ExchangeRateService exchangeRateService
     ) {
         this.tradeRepository = tradeRepository;
+        this.tradeHistoryRepository = tradeHistoryRepository;
         this.accountRepository = accountRepository;
         this.exchangeRateService = exchangeRateService;
     }
@@ -60,14 +67,18 @@ public class TradeService {
         Trade trade = new Trade();
         trade.setUserId(userId);
         applyRequest(trade, request, userId);
-        return toResponse(tradeRepository.save(trade));
+        Trade saved = tradeRepository.saveAndFlush(trade);
+        recordHistory(saved, TradeHistoryAction.CREATE);
+        return toResponse(saved);
     }
 
     public TradeResponse updateTrade(@NonNull UUID tradeId, TradeRequest request, String userId) {
         Trade trade = tradeRepository.findByIdAndUserId(Objects.requireNonNull(tradeId), userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trade not found"));
         applyRequest(trade, request, userId);
-        return toResponse(tradeRepository.save(trade));
+        Trade saved = tradeRepository.saveAndFlush(trade);
+        recordHistory(saved, TradeHistoryAction.EDIT);
+        return toResponse(saved);
     }
 
     public PagedResponse<TradeResponse> listTrades(String userId, int page, int size) {
@@ -145,7 +156,23 @@ public class TradeService {
     public void deleteTrade(@NonNull UUID tradeId, String userId) {
         Trade trade = tradeRepository.findByIdAndUserId(Objects.requireNonNull(tradeId), userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trade not found"));
+        recordHistory(trade, TradeHistoryAction.DELETE);
         tradeRepository.delete(trade);
+    }
+
+    public List<TradeHistoryResponse> listTradeHistory(@NonNull UUID tradeId, String userId) {
+        return tradeHistoryRepository.findByTradeIdAndUserIdOrderByActionAtAsc(
+                        Objects.requireNonNull(tradeId),
+                        userId
+                ).stream()
+                .map(TradeHistoryResponse::from)
+                .toList();
+    }
+
+    public List<TradeHistoryResponse> listTradeHistoryForUser(String userId) {
+        return tradeHistoryRepository.findByUserIdOrderByActionAtDesc(userId).stream()
+                .map(TradeHistoryResponse::from)
+                .toList();
     }
 
     public PnlSummaryResponse summarize(String userId, YearMonth month) {
@@ -435,6 +462,10 @@ public class TradeService {
         trade.setClosedAt(request.closedAt());
         trade.setNotes(request.notes());
         trade.setRealizedPnl(calculatePnl(trade));
+    }
+
+    private void recordHistory(Trade trade, TradeHistoryAction action) {
+        tradeHistoryRepository.save(TradeHistory.fromTrade(trade, action));
     }
 
     private BigDecimal calculatePnl(Trade trade) {

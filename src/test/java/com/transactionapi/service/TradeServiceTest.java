@@ -7,6 +7,7 @@ import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
+import com.transactionapi.constants.TradeHistoryAction;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AggregateStatsResponse;
@@ -15,11 +16,14 @@ import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
 import com.transactionapi.model.Account;
+import com.transactionapi.model.TradeHistory;
 import com.transactionapi.repository.AccountRepository;
+import com.transactionapi.repository.TradeHistoryRepository;
 import com.transactionapi.repository.TradeRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,10 +46,14 @@ class TradeServiceTest {
     private TradeRepository tradeRepository;
 
     @Autowired
+    private TradeHistoryRepository tradeHistoryRepository;
+
+    @Autowired
     private AccountRepository accountRepository;
 
     @BeforeEach
     void cleanDb() {
+        tradeHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
         accountRepository.deleteAll();
     }
@@ -72,6 +80,92 @@ class TradeServiceTest {
         TradeResponse response = tradeService.createTrade(request, USER_ID);
 
         assertThat(response.realizedPnl()).isEqualByComparingTo("396.00");
+    }
+
+    @Test
+    void recordsHistoryForCreateEditAndDelete() {
+        TradeResponse created = tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("102.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 2),
+                        "initial"
+                ),
+                USER_ID
+        );
+
+        tradeService.updateTrade(
+                created.id(),
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("13.00"),
+                        new BigDecimal("1.00"),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 3),
+                        LocalDate.of(2024, 5, 4),
+                        "updated"
+                ),
+                USER_ID
+        );
+
+        tradeService.deleteTrade(created.id(), USER_ID);
+
+        List<TradeHistory> history = tradeHistoryRepository.findByTradeIdOrderByActionAtAsc(created.id());
+
+        assertThat(history).hasSize(3);
+        assertThat(history).extracting(TradeHistory::getAction)
+                .containsExactlyInAnyOrder(
+                        TradeHistoryAction.CREATE,
+                        TradeHistoryAction.EDIT,
+                        TradeHistoryAction.DELETE
+                );
+
+        TradeHistory createHistory = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.CREATE)
+                .findFirst()
+                .orElseThrow();
+        assertThat(createHistory.getUserId()).isEqualTo(USER_ID);
+        assertThat(createHistory.getSymbol()).isEqualTo("AAPL");
+        assertThat(createHistory.getQuantity()).isEqualTo(10);
+        assertThat(createHistory.getRealizedPnl()).isEqualByComparingTo("20.00");
+        assertThat(createHistory.getTradeCreatedAt()).isNotNull();
+        assertThat(createHistory.getTradeUpdatedAt()).isNotNull();
+        assertThat(createHistory.getActionAt()).isNotNull();
+
+        TradeHistory editHistory = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.EDIT)
+                .findFirst()
+                .orElseThrow();
+        assertThat(editHistory.getSymbol()).isEqualTo("MSFT");
+        assertThat(editHistory.getQuantity()).isEqualTo(5);
+        assertThat(editHistory.getRealizedPnl()).isEqualByComparingTo("14.00");
+        assertThat(editHistory.getNotes()).isEqualTo("updated");
+
+        TradeHistory deleteHistory = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.DELETE)
+                .findFirst()
+                .orElseThrow();
+        assertThat(deleteHistory.getSymbol()).isEqualTo("MSFT");
+        assertThat(deleteHistory.getQuantity()).isEqualTo(5);
+        assertThat(deleteHistory.getNotes()).isEqualTo("updated");
+        assertThat(tradeRepository.findById(created.id())).isEmpty();
     }
 
     @Test

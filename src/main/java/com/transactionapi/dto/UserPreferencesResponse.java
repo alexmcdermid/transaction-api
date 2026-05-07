@@ -10,7 +10,8 @@ public record UserPreferencesResponse(
         ThemeMode themeMode,
         PnlDisplayMode pnlDisplayMode,
         TradeSortField defaultTradeSortBy,
-        TradeSortDirection defaultTradeSortDirection
+        TradeSortDirection defaultTradeSortDirection,
+        boolean showTradeHistory
 ) {
     public static UserPreferencesResponse from(User user) {
         ThemeMode themeMode = user.getThemeMode() != null ? user.getThemeMode() : ThemeMode.LIGHT;
@@ -22,6 +23,12 @@ public record UserPreferencesResponse(
         TradeSortDirection defaultTradeSortDirection = user.getDefaultTradeSortDirection() != null
                 ? user.getDefaultTradeSortDirection()
                 : TradeSortDirection.defaultValue();
-        return new UserPreferencesResponse(themeMode, pnlDisplayMode, defaultTradeSortBy, defaultTradeSortDirection);
+        return new UserPreferencesResponse(
+                themeMode,
+                pnlDisplayMode,
+                defaultTradeSortBy,
+                defaultTradeSortDirection,
+                user.isShowTradeHistory()
+        );
     }
 }
