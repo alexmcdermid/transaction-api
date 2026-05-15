@@ -60,10 +60,13 @@ jobs:
           import os
           
           def required(name):
-              value = os.environ.get(name, "")
+              value = os.environ.get(name, "").strip()
               if not value:
                   raise SystemExit(f"Missing required env var: {name}")
               return value
+
+          def optional(name):
+              return os.environ.get(name, "").strip()
           
           env = {
               "DATABASE_URL": required("DATABASE_URL"),
@@ -87,8 +90,8 @@ jobs:
           }
           
           optional = {
-              "APP_SECURITY_ALLOWED_EMAILS": os.environ.get("APP_SECURITY_ALLOWED_EMAILS", ""),
-              "APP_SECURITY_ADMIN_EMAILS": os.environ.get("APP_SECURITY_ADMIN_EMAILS", ""),
+              "APP_SECURITY_ALLOWED_EMAILS": optional("APP_SECURITY_ALLOWED_EMAILS"),
+              "APP_SECURITY_ADMIN_EMAILS": optional("APP_SECURITY_ADMIN_EMAILS"),
           }
           env.update({k: v for k, v in optional.items() if v})
           
