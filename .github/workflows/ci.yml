@@ -60,7 +60,15 @@ jobs:
           APP_SECURITY_ALLOW_HEADER_AUTH: "false"
           APP_SECURITY_JWT_ISSUER_URI: "https://accounts.google.com"
           APP_SECURITY_JWT_AUDIENCE: ${{ secrets.DEV_GOOGLE_CLIENT_ID }}
-          APP_SECURITY_JWT_JWK_SET: ${{ secrets.DEV_GOOGLE_JWK_SET }}
+          APP_SECURITY_JWT_JWK_SOURCE: "dynamo"
+          APP_SECURITY_JWT_JWS_ALGORITHMS: "RS256"
+          APP_SECURITY_JWT_JWK_REFRESH_INTERVAL: "PT15M"
+          APP_SECURITY_JWT_DYNAMO_TABLE: "AuthJwks"
+          APP_SECURITY_JWT_DYNAMO_KEY_ATTRIBUTE: "provider"
+          APP_SECURITY_JWT_DYNAMO_KEY: "google"
+          APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE: "jwks"
+          APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE: "expiresAt"
+          APP_SECURITY_JWT_DYNAMO_MAX_STALE: "PT72H"
           APP_FX_SOURCE: "dynamo"
           APP_AWS_REGION: ${{ secrets.AWS_REGION }}
           APP_FX_DYNAMO_TABLE: "ExchangeRates"
@@ -83,6 +91,15 @@ jobs:
               "APP_SECURITY_ALLOW_HEADER_AUTH": required("APP_SECURITY_ALLOW_HEADER_AUTH"),
               "APP_SECURITY_JWT_ISSUER_URI": required("APP_SECURITY_JWT_ISSUER_URI"),
               "APP_SECURITY_JWT_AUDIENCE": required("APP_SECURITY_JWT_AUDIENCE"),
+              "APP_SECURITY_JWT_JWK_SOURCE": required("APP_SECURITY_JWT_JWK_SOURCE"),
+              "APP_SECURITY_JWT_JWS_ALGORITHMS": required("APP_SECURITY_JWT_JWS_ALGORITHMS"),
+              "APP_SECURITY_JWT_JWK_REFRESH_INTERVAL": required("APP_SECURITY_JWT_JWK_REFRESH_INTERVAL"),
+              "APP_SECURITY_JWT_DYNAMO_TABLE": required("APP_SECURITY_JWT_DYNAMO_TABLE"),
+              "APP_SECURITY_JWT_DYNAMO_KEY_ATTRIBUTE": required("APP_SECURITY_JWT_DYNAMO_KEY_ATTRIBUTE"),
+              "APP_SECURITY_JWT_DYNAMO_KEY": required("APP_SECURITY_JWT_DYNAMO_KEY"),
+              "APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE": required("APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE"),
+              "APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE": required("APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE"),
+              "APP_SECURITY_JWT_DYNAMO_MAX_STALE": required("APP_SECURITY_JWT_DYNAMO_MAX_STALE"),
               "APP_FX_SOURCE": required("APP_FX_SOURCE"),
               "APP_AWS_REGION": required("APP_AWS_REGION"),
               "APP_FX_DYNAMO_TABLE": required("APP_FX_DYNAMO_TABLE"),
@@ -91,7 +108,6 @@ jobs:
           optional = {
               "APP_SECURITY_ALLOWED_EMAILS": os.environ.get("APP_SECURITY_ALLOWED_EMAILS", ""),
               "APP_SECURITY_ADMIN_EMAILS": os.environ.get("APP_SECURITY_ADMIN_EMAILS", ""),
-              "APP_SECURITY_JWT_JWK_SET": os.environ.get("APP_SECURITY_JWT_JWK_SET", ""),
           }
           env.update({k: v for k, v in optional.items() if v})
           

@@ -87,11 +87,17 @@ Required:
 - `APP_SECURITY_ALLOW_HEADER_AUTH=false`
 - `APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com`
 - `APP_SECURITY_JWT_AUDIENCE=<Google client id>`
+- `APP_SECURITY_JWT_JWK_SOURCE=dynamo`
+- `APP_SECURITY_JWT_DYNAMO_TABLE=AuthJwks`
+- `APP_SECURITY_JWT_DYNAMO_KEY=google`
+- `APP_AWS_REGION=<AWS region>`
+- `APP_FX_SOURCE=dynamo`
+- `APP_FX_DYNAMO_TABLE=ExchangeRates`
 
 Optional:
 - `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
 - `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
-- `APP_SECURITY_JWT_JWK_SET` (pin JWKS JSON)
+- `APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H`
 
 ## CI/CD (GitHub Actions)
 
@@ -107,7 +113,6 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `DEV_ALLOWED_EMAILS` (optional)
 - `DEV_ADMIN_EMAILS` (optional)
 - `DEV_GOOGLE_CLIENT_ID`
-- `DEV_GOOGLE_JWK_SET` (optional)
 
 ### Required GitHub Secrets (Prod)
 - `AWS_REGION`
@@ -117,7 +122,7 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `PROD_DATABASE_URL`
 - `PROD_CORS_ALLOWED_ORIGINS`
 - `PROD_GOOGLE_CLIENT_ID`
-- `PROD_GOOGLE_JWK_SET` (optional)
+- `PROD_ALLOWED_EMAILS` (optional)
 - `PROD_ADMIN_EMAILS` (optional)
 
 ### OIDC Permissions
@@ -133,6 +138,13 @@ Role permissions for App Runner deploys must include:
 - **App Runner:** reads the latest CAD/USD rate from DynamoDB on startup + daily schedule.
 - **Local:** uses the direct BoC/CBSA HTTP call for quick debugging.
 - **Why DynamoDB:** stable, low-cost, VPC-friendly via a DynamoDB gateway endpoint.
+
+### JWT Keys (OIDC -> DynamoDB -> App Runner)
+- **Goal:** let App Runner validate OIDC JWTs without outbound internet or NAT.
+- **Flow:** Lambda (outside VPC) fetches provider JWKS, writes the complete JWKS document into DynamoDB.
+- **App Runner:** set `APP_SECURITY_JWT_JWK_SOURCE=dynamo` and read keys through the DynamoDB gateway endpoint.
+- **Staleness:** preserve the last good JWKS on Lambda fetch failure; backend rejects keys older than `APP_SECURITY_JWT_DYNAMO_MAX_STALE`.
+- Full deployment checklist: `docs/private-app-runner-neon.md`.
 
 ### Performance Optimizations
 - **Aggregate Stats Endpoint** (`/api/v1/trades/stats`) uses database-level aggregation with native SQL queries for O(1) memory usage

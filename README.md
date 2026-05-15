@@ -31,3 +31,5 @@ Trades are stored per-user in PostgreSQL. Authentication is handled via Google O
 ## Development
 
 See [DEV.md](DEV.md) for setup instructions, API documentation, and deployment details.
+
+For the target private App Runner deployment, see [Private App Runner + Neon Deployment](docs/private-app-runner-neon.md).
