@@ -53,7 +53,8 @@ mvn test -Dtest=TradeServiceTest
 ## Authentication
 
 ### Development Mode (Header-based)
-- Default: stateless requests, `X-User-Id` header is accepted and turned into an authenticated principal
+- Header auth is disabled by default. For local/dev-only header auth, set `app.security.allow-header-auth=true`
+- When enabled, stateless requests can use `X-User-Id` as the authenticated principal
 - Set `app.security.dev-user-id=local-user` to avoid passing the header locally
 - Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication
 

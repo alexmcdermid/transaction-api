@@ -1,9 +1,10 @@
 package com.transactionapi.controller;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -539,6 +541,122 @@ class TradeControllerTest {
     }
 
     @Test
+    void jwtUserCannotAccessAnotherJwtUsersTrades() throws Exception {
+        String userA = "google-sub-trade-owner";
+        String userB = "google-sub-trade-other";
+
+        TradeRequest trade = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("110.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 1, 10),
+                LocalDate.of(2024, 1, 10),
+                null
+        );
+
+        String id = objectMapper.readTree(
+                        mockMvc.perform(
+                                        post(ApiPaths.TRADES)
+                                                .with(jwtUser(userA, "owner@example.com"))
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(objectMapper.writeValueAsString(trade))
+                                )
+                                .andExpect(status().isCreated())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString()
+                )
+                .get("id")
+                .asText();
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES)
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/summary")
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats")
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats/scoped")
+                                .with(jwtUser(userB, "other@example.com"))
+                                .param("year", "2024")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2024))
+                .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/" + id + "/history")
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/" + id)
+                                .with(jwtUser(userB, "other@example.com"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(trade))
+                )
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+                        delete(ApiPaths.TRADES + "/" + id)
+                                .with(jwtUser(userB, "other@example.com"))
+                )
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES)
+                                .with(jwtUser(userB, "other@example.com"))
+                                .header("X-User-Id", userA)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES)
+                                .with(jwtUser(userA, "owner@example.com"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(id));
+    }
+
+    @Test
     void returnsHistoryForUsersOwnTradeOnly() throws Exception {
         String owner = "history-owner";
         String other = "history-other";
@@ -615,5 +733,12 @@ class TradeControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private static RequestPostProcessor jwtUser(String subject, String email) {
+        return jwt().jwt(jwt -> jwt
+                .subject(subject)
+                .claim("email", email)
+        );
     }
 }

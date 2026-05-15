@@ -18,7 +18,7 @@ import org.springframework.lang.NonNull;
 @Component
 public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
 
-    @Value("${app.security.allow-header-auth:true}")
+    @Value("${app.security.allow-header-auth:false}")
     private boolean allowHeaderAuth;
 
     @Value("${app.security.header-name:X-User-Id}")
