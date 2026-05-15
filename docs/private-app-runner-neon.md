@@ -1,16 +1,23 @@
-# Private App Runner + Neon Deployment
+# App Runner, Neon PrivateLink, DynamoDB Runbook
 
-Phase 1 target architecture for the current two-repo/two-service setup:
+This is the current deployment model. We are deliberately keeping four App Runner services for now:
+
+```text
+dev frontend App Runner   -> public ingress, no VPC connector
+dev backend App Runner    -> public ingress, VPC egress, no NAT
+prod frontend App Runner  -> public ingress, no VPC connector
+prod backend App Runner   -> public ingress, VPC egress, no NAT
+```
+
+Only backend services need private networking. The frontend never talks directly to Neon or DynamoDB.
 
 ```text
 Browser
-  -> public frontend App Runner custom domain
-  -> frontend App Runner service, no VPC connector required
-  -> public backend App Runner custom domain
-  -> backend App Runner service
-  -> backend App Runner VPC connector, no NAT
+  -> frontend App Runner custom domain
+  -> backend App Runner custom domain
+  -> backend App Runner VPC connector
   -> Neon PrivateLink endpoint for Postgres
-  -> DynamoDB gateway endpoint for FX rates and provider JWKS
+  -> DynamoDB gateway endpoint for FX rates and Google JWKS
 
 EventBridge
   -> Lambda outside VPC
@@ -18,81 +25,386 @@ EventBridge
   -> write latest documents to DynamoDB
 ```
 
-Both App Runner services remain publicly reachable. The VPC connector is only for backend outbound application traffic. The frontend does not need private networking because it never connects to Neon or DynamoDB directly.
+The backend remains publicly reachable for API traffic. The VPC connector only changes backend outbound traffic. With no NAT, backend runtime calls must be limited to private/VPC-reachable services such as Neon PrivateLink and DynamoDB.
 
-This document keeps the current Google OAuth frontend model. The browser still talks to Google directly, and the backend validates Google ID tokens using the JWKS document mirrored into DynamoDB. A later first-party session/JWT layer would reduce provider-token usage on every API call, but it is not required for the no-NAT deployment.
+## Deployment Identifiers
+
+Do not commit concrete AWS account IDs, VPC IDs, subnet IDs, route table IDs, VPC endpoint IDs, security group IDs, App Runner generated hostnames, Neon organization IDs, Neon project IDs, or production DNS targets.
+
+Keep those values in the deployment environment, AWS console, Neon console, password manager, or an untracked local operator note. This committed runbook intentionally uses placeholders.
+
+## Repo Scope
+
+Implemented in this PR:
+
+- Backend supports `app.security.jwt.jwk-source=dynamo`.
+- Backend reads Google JWKS from DynamoDB and refreshes its local verifier cache.
+- Backend DynamoDB config supports both FX and JWKS reads.
+- Backend GitHub workflows deploy with Dynamo-backed JWKS instead of inline JWKS.
+
+Not included:
+
+- Combining frontend and backend into one container.
+- Combining frontend and backend into one App Runner per environment.
+- Moving to first-party sessions.
+
+## Shared Auth Model
+
+The app keeps the current Google OAuth frontend model:
+
+- The browser talks to Google directly.
+- The frontend sends the Google ID token to the backend as a bearer token.
+- The backend validates the token locally using Google JWKS mirrored into DynamoDB.
 
 For this small project, shared auth metadata is acceptable:
 
-- Use one Google OAuth client ID for local/dev/prod.
-- Add each frontend origin to that OAuth client, for example `http://localhost:5173`, `https://dev.tradelog.ca`, and `https://tradelog.ca`.
-- Use the same `APP_SECURITY_JWT_AUDIENCE` in dev and prod.
-- Leave `APP_SECURITY_ALLOWED_EMAILS` empty if any Google account should be allowed to create and use its own isolated data.
-- Keep `APP_SECURITY_ADMIN_EMAILS` environment-specific.
-- Sharing JWKS and FX DynamoDB tables across dev/prod is fine because those documents are provider/public market metadata, not user data or secrets.
+- Use one Google OAuth web client ID for local/dev/prod.
+- Add all frontend origins to that OAuth client:
+  - `http://localhost:5173`
+  - `<dev-frontend-origin>`
+  - `<prod-frontend-origin>`
+  - `<prod-root-origin-if-forwarded-or-supported>`
+- Use the same Google client ID as backend `APP_SECURITY_JWT_AUDIENCE`.
+- Leave `APP_SECURITY_ALLOWED_EMAILS` empty if any Google account can sign up and use isolated per-user data.
+- Keep `APP_SECURITY_ADMIN_EMAILS` restricted.
 
-## This PR Scope
+## GitHub Secrets
 
-Done:
+The `*_ECR_*_REPO` values are ECR repository names, not full ECR URIs.
 
-- Backend supports `app.security.jwt.jwk-source=dynamo`.
-- Backend can read provider JWKS from DynamoDB and refresh its local verifier cache.
-- Existing DynamoDB client config now supports both FX and JWKS readers.
+### Frontend Repo: `tradingView`
 
-Not included in this PR:
+Prod environment secrets:
 
-- Add a combined container image that runs the frontend SSR server, backend API, and one reverse proxy.
-- Route `/api/v1/*` to Spring Boot and all other paths to the React Router server.
-- Build frontend with `VITE_API_BASE_URL=/api/v1`.
-- If React Router loaders need server-side API calls, add a server-only internal API base such as `http://127.0.0.1:8080/api/v1`.
-- Update CI to build/push one image per environment instead of separate frontend/backend images.
+```text
+AWS_REGION=<aws-region>
+AWS_ROLE_ARN=arn:aws:iam::<account-id>:role/<frontend-github-actions-role-name>
+PROD_ECR_TRADINGVIEW_REPO=<prod-frontend-ecr-repo-name>
+PROD_FRONTEND_SERVICE_ARN=arn:aws:apprunner:<region>:<account-id>:service/<service-name>/<service-id>
+PROD_API_BASE_URL=<prod-api-origin>/api/v1
+PROD_GOOGLE_CLIENT_ID=<google-web-client-id>
+PROD_ADMIN_EMAILS=<comma-separated-admin-emails>
+```
 
-The single-service App Runner consolidation can happen later. This phase keeps the existing frontend and backend repositories and CI/CD pipelines.
+Dev environment secrets use the same names with `DEV_`.
 
-## AWS Resources
+### Backend Repo: `transaction-api`
 
-Create one set per environment unless noted otherwise. DynamoDB tables and the scheduled Lambda jobs can be shared by dev/prod.
+Prod environment secrets:
 
-### 1. VPC
+```text
+AWS_REGION=<aws-region>
+AWS_ROLE_ARN=arn:aws:iam::<account-id>:role/<backend-github-actions-role-name>
+PROD_ECR_TRANSACTION_API_REPO=<prod-backend-ecr-repo-name>
+PROD_BACKEND_SERVICE_ARN=arn:aws:apprunner:<region>:<account-id>:service/<service-name>/<service-id>
+PROD_DATABASE_URL=<jdbc-neon-url>
+PROD_CORS_ALLOWED_ORIGINS=<prod-frontend-origin>,<prod-root-origin-if-forwarded-or-supported>
+PROD_GOOGLE_CLIENT_ID=<google-web-client-id>
+PROD_ALLOWED_EMAILS=<optional-comma-separated-allowlist>
+PROD_ADMIN_EMAILS=<comma-separated-admin-emails>
+```
 
-Use private subnets across at least two AZs.
+Leave `PROD_ALLOWED_EMAILS` empty for public Google signup.
 
-No NAT Gateway is required for this design.
+## Neon JDBC URL Format
 
-Required endpoints:
+Use JDBC query params for credentials. Do not use `user:password@host`.
 
-- **DynamoDB gateway endpoint** attached to the private subnet route tables.
-- **Neon PrivateLink interface endpoint(s)** in the same VPC and AWS region as the App Runner VPC connector.
+Correct:
 
-Security groups:
+```text
+jdbc:postgresql://<host>:5432/<db>?user=<user>&password=<url-encoded-password>&sslmode=require&channel_binding=require
+```
 
-- `backend-apprunner-egress-sg`: attach to the backend App Runner VPC connector.
-- `neon-privatelink-endpoint-sg`: attach to the Neon interface endpoint.
-- Allow inbound TCP `5432` on `neon-privatelink-endpoint-sg` from `backend-apprunner-egress-sg`.
-- Keep App Runner inbound public through App Runner. Do not configure App Runner private ingress unless you want the app reachable only from inside the VPC.
+Example:
 
-### 2. Neon Private Networking
+```text
+jdbc:postgresql://<neon-host>:5432/<database>?user=<database-user>&password=<encoded-password>&sslmode=require&channel_binding=require
+```
 
-In Neon:
+Wrong for this app:
 
-- Enable Private Networking for the project.
-- Assign the AWS VPC endpoint ID(s) to the Neon organization.
-- Enable private DNS on the AWS endpoint after Neon accepts the endpoint.
-- Restrict public internet access to the Neon project after the private path is verified.
+```text
+jdbc:postgresql://user:password@host/db?sslmode=require
+```
 
-The Neon database connection string does not change. Inside the VPC, private DNS should resolve the same Neon hostname to private endpoint IPs.
+If the password contains special characters, URL-encode them:
 
-Use separate Neon projects for dev/prod if possible. Separate branches are cheaper, but separate projects give cleaner blast-radius and public-access controls.
+```text
+@ -> %40
+: -> %3A
+/ -> %2F
+? -> %3F
+& -> %26
+# -> %23
+% -> %25
+```
 
-### 3. DynamoDB Tables
+## GitHub OIDC Roles
 
-These tables can be shared by dev and prod if both App Runner services run in the same AWS account/region.
+The workflows use GitHub environments, so the OIDC subject must allow `environment:prod`, not only `ref:refs/heads/main`.
 
-Existing FX table:
+Backend role trust policy should include:
 
-- Table: `ExchangeRates`
-- Partition key: `pair` string
-- CAD/USD item:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:<github-owner>/<backend-repo>:ref:refs/heads/main",
+            "repo:<github-owner>/<backend-repo>:environment:dev",
+            "repo:<github-owner>/<backend-repo>:environment:prod"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+Frontend role trust policy should include:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:<github-owner>/<frontend-repo>:ref:refs/heads/main",
+            "repo:<github-owner>/<frontend-repo>:environment:dev",
+            "repo:<github-owner>/<frontend-repo>:environment:prod"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+Deploy role permissions need:
+
+- `ecr:GetAuthorizationToken` on `*`
+- ECR push/read actions on the relevant ECR repos
+- `apprunner:UpdateService`
+- `apprunner:DescribeService`
+
+## Bootstrap Order For New Prod Services
+
+App Runner can only be created from an existing ECR image, but the deploy workflow needs an App Runner service ARN to fully complete.
+
+Use this order:
+
+1. Create prod ECR repos:
+   - `<prod-backend-ecr-repo-name>`
+   - `<prod-frontend-ecr-repo-name>`
+2. Set bootstrap GitHub secrets:
+   - `AWS_REGION`
+   - `AWS_ROLE_ARN`
+   - `PROD_ECR_*_REPO`
+   - frontend also needs `PROD_API_BASE_URL` and `PROD_GOOGLE_CLIENT_ID`
+3. Run prod deploy workflow once.
+4. It should build and push the ECR image.
+5. If `PROD_*_SERVICE_ARN` is missing, the workflow will fail after the image push. That is expected.
+6. Create the App Runner service from the pushed ECR image.
+7. Copy the App Runner service ARN into GitHub secrets.
+8. Run prod deploy again.
+
+If GitHub fails at `Could not assume role with OIDC`, fix the role trust policy before continuing. No ECR image is pushed until credentials are assumed.
+
+## App Runner Services
+
+### Frontend
+
+Service names:
+
+- `<dev-frontend-app-runner-service-name>`
+- `<prod-frontend-app-runner-service-name>`
+
+Configuration:
+
+- Source: ECR image.
+- Port: `3000`.
+- Incoming traffic: public.
+- Outgoing traffic: default public networking.
+- No VPC connector required.
+
+Build args:
+
+```text
+VITE_API_BASE_URL=<prod-api-origin>/api/v1
+VITE_GOOGLE_CLIENT_ID=<google-web-client-id>
+VITE_ADMIN_EMAILS=<comma-separated-admin-emails>
+VITE_USE_HEADER_AUTH=false
+VITE_USER_ID=
+```
+
+### Backend
+
+Service names:
+
+- `<dev-backend-app-runner-service-name>`
+- `<prod-backend-app-runner-service-name>`
+
+Configuration:
+
+- Source: ECR image.
+- Port: `8080`.
+- Incoming traffic: public.
+- Outgoing traffic: custom VPC connector.
+- VPC connector: private subnets and `<backend-egress-security-group-name>` for prod.
+- No NAT Gateway.
+- Instance role: DynamoDB read role.
+
+Do not set incoming traffic to private for the backend API unless an API Gateway/private client design is introduced. The frontend needs to reach the backend API over the public App Runner/custom domain.
+
+Runtime env:
+
+```text
+DATABASE_URL=<jdbc-neon-url>
+DB_MAX_POOL_SIZE=3
+DB_MIN_IDLE=0
+
+APP_AWS_REGION=<aws-region>
+APP_CORS_ALLOWED_ORIGINS=<prod-frontend-origin>,<prod-root-origin-if-forwarded-or-supported>
+
+APP_FX_SOURCE=dynamo
+APP_FX_DYNAMO_TABLE=ExchangeRates
+
+APP_SECURITY_JWT_ENABLED=true
+APP_SECURITY_ALLOW_HEADER_AUTH=false
+APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com
+APP_SECURITY_JWT_AUDIENCE=<google-web-client-id>
+APP_SECURITY_JWT_JWK_SOURCE=dynamo
+APP_SECURITY_JWT_JWS_ALGORITHMS=RS256
+APP_SECURITY_JWT_JWK_REFRESH_INTERVAL=PT15M
+APP_SECURITY_JWT_DYNAMO_TABLE=AuthJwks
+APP_SECURITY_JWT_DYNAMO_KEY_ATTRIBUTE=provider
+APP_SECURITY_JWT_DYNAMO_KEY=google
+APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE=jwks
+APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE=expiresAt
+APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H
+
+APP_SECURITY_ALLOWED_EMAILS=
+APP_SECURITY_ADMIN_EMAILS=<comma-separated-admin-emails>
+```
+
+## Public DNS And Custom Domains
+
+Current DNS provider: `<dns-provider>`.
+
+Current public domain model:
+
+```text
+<prod-root-origin>      -> DNS provider 301 forwarding -> <prod-frontend-origin>
+<prod-frontend-origin>  -> App Runner prod frontend
+<prod-api-origin>       -> App Runner prod backend
+<dev-frontend-origin>   -> App Runner dev frontend
+<dev-api-origin>        -> App Runner dev backend
+```
+
+DNS records that matter:
+
+```text
+A      @                <dns-provider-forwarding-ip-1>
+A      @                <dns-provider-forwarding-ip-2>
+CNAME  <prod-frontend> <prod-frontend-apprunner-hostname>
+CNAME  <prod-api>      <prod-backend-apprunner-hostname>
+CNAME  <dev-frontend>  <dev-frontend-apprunner-hostname>
+CNAME  <dev-api>       <dev-backend-apprunner-hostname>
+```
+
+If using DNS-provider forwarding, the `A @` records are forwarding infrastructure. They do not point directly to App Runner.
+
+Keep all AWS ACM validation CNAMEs created by App Runner. They are required for certificate validation and renewal.
+
+The frontend App Runner service must have the canonical frontend hostname linked as an active custom domain, not only the root hostname. A DNS `CNAME <frontend-host> -> <service-generated-hostname>` is not enough by itself because App Runner still needs to issue/bind a certificate for that exact hostname. If the canonical frontend hostname is missing from App Runner custom domains, browsers will fail TLS even though DNS points at the right service.
+
+DNS-provider forwarding configuration:
+
+```text
+From: <prod-root-origin>
+To: <prod-frontend-origin>
+Type: Permanent 301
+Mode: Forward only
+```
+
+Do not use forwarding with masking. Masking frames the app and can break auth, routing, redirects, cookies, and browser APIs.
+
+### Why Root Domain Is Special
+
+The root domain is the DNS apex. The apex must already have `NS` and `SOA` records, so it cannot be a normal CNAME. App Runner gives a hostname, not stable IPs, so an ordinary `A @` record cannot directly target App Runner.
+
+Subdomains can use normal CNAMEs:
+
+```text
+<prod-frontend-host> -> App Runner
+<prod-api-host> -> App Runner
+```
+
+The root domain needs one of these:
+
+- DNS provider apex aliasing, such as Route 53 Alias, Cloudflare CNAME flattening, or an ALIAS/ANAME feature.
+- HTTP forwarding from root to `www`.
+- A reverse proxy/CDN with stable apex support in front of App Runner.
+
+### Future Cleaner Options
+
+Option 1: move DNS hosting to Route 53 while keeping the domain registered at the current registrar.
+
+- Create a Route 53 public hosted zone for `<prod-domain>`.
+- Copy all existing DNS records into Route 53.
+- Create a Route 53 `A`/`AAAA` alias for `<prod-root-host>` to the App Runner frontend service.
+- Keep frontend/API/dev records.
+- Change registrar nameservers to the four Route 53 nameservers.
+
+This lets the browser stay on `<prod-root-origin>` without forwarding.
+
+Option 2: move DNS hosting to Cloudflare.
+
+- Use Cloudflare CNAME flattening for `<prod-root-host>`.
+- Keep frontend/API/dev records as DNS-only unless intentionally proxying.
+- Be careful if proxying App Runner traffic through Cloudflare; test Host headers, TLS mode, OAuth redirects, and websocket/API behavior.
+
+Option 3: keep DNS-provider forwarding.
+
+- Lowest effort.
+- Browser canonical URL becomes `<prod-frontend-origin>`.
+- App and OAuth config should include both `<prod-frontend-origin>` and `<prod-root-origin>`, but treat the forwarded frontend origin as canonical.
+
+## DynamoDB
+
+These tables can be shared by dev and prod in the same AWS account/region.
+
+### `ExchangeRates`
+
+Partition key:
+
+```text
+pair string
+```
+
+CAD/USD item:
 
 ```json
 {
@@ -102,11 +414,15 @@ Existing FX table:
 }
 ```
 
-New JWKS table:
+### `AuthJwks`
 
-- Table: `AuthJwks`
-- Partition key: `provider` string
-- Google item:
+Partition key:
+
+```text
+provider string
+```
+
+Google item:
 
 ```json
 {
@@ -114,38 +430,45 @@ New JWKS table:
   "issuer": "https://accounts.google.com",
   "jwks": "{\"keys\":[...]}",
   "fetchedAt": "2026-05-15T15:00:00Z",
-  "expiresAt": "2026-05-15T21:00:00Z",
-  "etag": "\"optional-provider-etag\""
+  "expiresAt": "2026-05-15T21:00:00Z"
 }
 ```
 
-The backend currently reads only `provider`, `jwks`, and `expiresAt`. The extra fields are for operator visibility and Lambda idempotency.
+`jwks` must be a DynamoDB string containing the complete JSON JWKS document. The backend reads `provider`, `jwks`, and `expiresAt`.
 
-### 4. Lambda Jobs
+## Lambda Jobs
 
-Run these Lambdas outside the VPC unless they need private resources. Outside-VPC Lambdas can call public internet endpoints without NAT.
+Run Lambdas outside the VPC unless they need private resources. Outside-VPC Lambdas can call public internet endpoints without NAT.
 
 One JWKS Lambda and one FX Lambda can serve both dev and prod.
 
-JWKS Lambda:
+### Google JWKS Lambda
 
 - Trigger: EventBridge schedule every 1 to 6 hours.
 - Fetch Google JWKS from `https://www.googleapis.com/oauth2/v3/certs`.
-- Preserve the previous DynamoDB item if the fetch fails.
+- Preserve the previous DynamoDB item if fetch fails.
 - Parse `Cache-Control: max-age=<seconds>` when present.
-- Set `expiresAt` from the cache max-age. If missing, use a conservative default such as 6 hours.
+- Set `expiresAt` from cache max-age. If missing, use a conservative default such as 6 hours.
 - Write the full JWKS JSON to `AuthJwks`.
-- Do not filter keys down to one `kid`; store the whole JWKS because providers rotate keys.
+- Do not filter keys down to one `kid`.
 
-FX Lambda:
+### FX Lambda
 
 - Keep the existing BoC/CBSA flow.
-- Write the latest CAD/USD quote to `ExchangeRates`.
+- Write latest CAD/USD quote to `ExchangeRates`.
 - Preserve the previous good quote on fetch failure.
 
-### 5. IAM
+## IAM Runtime Roles
 
-App Runner instance role:
+### Backend App Runner Instance Role
+
+Trust entity:
+
+```text
+tasks.apprunner.amazonaws.com
+```
+
+Policy:
 
 ```json
 {
@@ -163,7 +486,9 @@ App Runner instance role:
 }
 ```
 
-JWKS Lambda role:
+### JWKS Lambda Role
+
+Policy:
 
 ```json
 {
@@ -178,90 +503,230 @@ JWKS Lambda role:
 }
 ```
 
-FX Lambda role:
+## VPC And Neon PrivateLink
 
-- Existing permissions should allow writes to `ExchangeRates`.
+Use the same AWS region for:
 
-### 6. App Runner
+- Backend App Runner service.
+- Backend App Runner VPC connector.
+- VPC endpoints.
+- Neon project.
 
-Keep the current two-service setup for this phase.
+### VPC Baseline
 
-Frontend App Runner services:
+For a no-NAT backend, the VPC must still have DNS support:
 
-- Keep existing public ingress.
-- No VPC connector required.
-- Keep `VITE_API_BASE_URL` pointed at the backend custom domain, for example `https://api-dev.tradelog.ca/api/v1`.
-
-Backend App Runner services:
-
-- `transaction-api-dev`
-- `transaction-api-prod`
-- Source: backend ECR image.
-- Incoming traffic: public.
-- Outgoing traffic: custom VPC connector.
-- VPC connector: private subnets and `backend-apprunner-egress-sg`.
-- No NAT Gateway.
-
-Backend runtime env:
-
-```properties
-APP_AWS_REGION=<aws-region>
-
-DATABASE_URL=<neon-jdbc-url>
-DB_MAX_POOL_SIZE=3
-DB_MIN_IDLE=0
-
-APP_FX_SOURCE=dynamo
-APP_FX_DYNAMO_TABLE=ExchangeRates
-
-APP_SECURITY_JWT_ENABLED=true
-APP_SECURITY_ALLOW_HEADER_AUTH=false
-APP_SECURITY_JWT_ISSUER_URI=https://accounts.google.com
-APP_SECURITY_JWT_AUDIENCE=<google-client-id>
-APP_SECURITY_JWT_JWK_SOURCE=dynamo
-APP_SECURITY_JWT_JWS_ALGORITHMS=RS256
-APP_SECURITY_JWT_JWK_REFRESH_INTERVAL=PT15M
-APP_SECURITY_JWT_DYNAMO_TABLE=AuthJwks
-APP_SECURITY_JWT_DYNAMO_KEY_ATTRIBUTE=provider
-APP_SECURITY_JWT_DYNAMO_KEY=google
-APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE=jwks
-APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE=expiresAt
-APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H
-
-APP_SECURITY_ALLOWED_EMAILS=<comma-separated-allowed-emails>
-APP_SECURITY_ADMIN_EMAILS=<comma-separated-admin-emails>
+```text
+DNS resolution: Enabled
+DNS hostnames: Enabled
 ```
 
-Keep frontend build args as they are today, except make sure each frontend points to the correct backend custom domain and uses the same Google OAuth client ID/audience as the backend.
+In the AWS console:
 
-## Dev to Prod Data Promotion
+1. VPC -> Your VPCs.
+2. Select `<prod-vpc-name>`.
+3. Actions -> Edit VPC settings.
+4. Enable DNS hostnames.
+5. Save.
 
-Using the current dev database as the initial prod database is acceptable for a small project if you treat it as a one-time seed, not an ongoing dev-to-prod replication stream.
+If DNS hostnames are disabled, App Runner can start but database startup can hang/fail because the Neon hostname does not resolve through the PrivateLink path as expected.
+
+The prod private route table should have:
+
+```text
+<prod-vpc-cidr> -> local
+com.amazonaws.<aws-region>.dynamodb prefix list -> <dynamodb-gateway-endpoint-name>
+```
+
+Do not add an internet gateway or NAT route to this private route table for the no-NAT design.
+
+### VPC Endpoint Setup
+
+Create a security group:
+
+```text
+<backend-egress-security-group-name>
+```
+
+Attach it to the backend App Runner VPC connector.
+
+Outbound rule:
+
+```text
+Type: All traffic
+Destination: 0.0.0.0/0
+```
+
+This is acceptable because the selected private subnets have no NAT/IGW route. The route table still limits reachable destinations to local VPC resources and configured VPC endpoints.
+
+Create another security group:
+
+```text
+neon-privatelink-endpoint-sg
+```
+
+Inbound rule:
+
+```text
+Type: PostgreSQL
+Port: 5432
+Source: <backend-egress-security-group-name>
+```
+
+Required VPC endpoints:
+
+- DynamoDB gateway endpoint attached to private subnet route tables.
+- Neon interface endpoint(s) for the Neon service names in your region.
+
+Some Neon regions require one VPC endpoint for each service name. Copy the current service names from Neon Private Networking docs or the Neon console for the target region:
+
+```text
+<neon-privatelink-service-name-1>
+<neon-privatelink-service-name-2-if-required>
+<neon-privatelink-service-name-3-if-required>
+```
+
+When creating Neon endpoints in AWS:
+
+1. AWS Console -> VPC -> Endpoints -> Create endpoint.
+2. Choose endpoint services that use NLBs/GWLBs.
+3. Paste Neon service name.
+4. Verify service.
+5. Select the same VPC as the backend App Runner connector.
+6. Select private subnets.
+7. Attach `neon-privatelink-endpoint-sg`.
+8. Do not enable private DNS yet.
+9. Create endpoint.
+10. Copy each generated `vpce-*` endpoint ID.
+
+After endpoint creation, verify each Neon endpoint uses:
+
+```text
+VPC: <prod-vpc-name>
+Subnets: the three prod private subnets
+Security group: neon-privatelink-endpoint-sg
+Status: Available
+```
+
+If the endpoints show `Pending` after a modification, wait for them to return to `Available` before retrying App Runner. If they remain `Pending` for more than 10-15 minutes, re-run the Neon endpoint assignment commands.
+
+### Assign Endpoints In Neon
+
+Neon wants VPC endpoint IDs, not the VPC ID. The examples below use the `neon` CLI command shown in Neon docs; if the local install is exposed as `neonctl`, use the same subcommands with `neonctl`.
+
+Install/auth Neon CLI:
+
+```bash
+neon auth
+neon orgs list
+neon projects list
+```
+
+Assign each endpoint to the Neon organization:
+
+```bash
+neon vpc endpoint assign vpce-xxxxxxxx \
+  --org-id <neon-org-id> \
+  --region-id <neon-region-id>
+```
+
+After Neon accepts the endpoints:
+
+1. AWS Console -> VPC -> Endpoints.
+2. Select each Neon endpoint.
+3. Actions -> Modify private DNS name.
+4. Enable private DNS.
+
+Enabling private DNS can temporarily move the endpoint back to `Pending`. Wait until all three Neon endpoints are `Available` again before updating App Runner.
+
+The Neon connection string does not change. Inside the VPC, private DNS should resolve the same Neon hostname to private endpoint IPs.
+
+Only after testing should you restrict/block public Neon access.
+
+Neon's "Allow traffic via Virtual Private Network (VPC)" project setting is project-scoped. Enabling it on the prod project does not break other Neon projects unless those apps also use the same project. If old apps share the same Neon project, project-level restrictions can affect them.
+
+To restrict a Neon project to specific VPC endpoints through the CLI, apply each endpoint ID to the project:
+
+```bash
+neon vpc project restrict vpce-xxxxxxxx --project-id <neon-project-id>
+```
+
+If the region uses multiple service names, restrict the project to all endpoint IDs for that region. After the private path is verified, public internet access can be blocked:
+
+```bash
+neon projects update <neon-project-id> --block-public-connections true
+```
+
+### App Runner VPC Connector
+
+Backend App Runner networking:
+
+```text
+Incoming network traffic: Public endpoint
+Endpoint IP address type: IPv4
+Outgoing network traffic: Custom VPC
+VPC connector: transaction-api prod connector
+```
+
+The connector must use:
+
+```text
+VPC: <prod-vpc-name> / <prod-vpc-id>
+Subnets: the prod private subnets associated with <prod-private-route-table-name>
+Security group: <backend-egress-security-group-name> / <backend-egress-security-group-id>
+```
+
+If App Runner rolls back to public egress after saving the VPC connector, treat that as an app startup failure. App Runner applies the network change, the container fails health/startup, and App Runner restores the previous config. Look at the failed deployment logs.
+
+The common failure signature for DB networking is:
+
+```text
+HikariPool-1 - Starting...
+...
+Error creating bean with name 'userRepository'
+Cannot resolve reference to bean 'jpaSharedEM_entityManagerFactory'
+```
+
+Scroll to the bottom-most `Caused by:` in the log. It should identify the real issue, such as `Connection timed out`, `UnknownHostException`, `Connection refused`, or authentication failure.
+
+## Verification
+
+Before blocking public Neon access:
+
+- Backend App Runner deploy succeeds.
+- Backend health endpoint returns `UP`.
+- `<prod-vpc-name>` has DNS resolution and DNS hostnames enabled.
+- All three Neon interface endpoints are `Available`.
+- All three Neon interface endpoints have private DNS enabled.
+- JWKS Lambda writes `AuthJwks/provider=google`.
+- FX Lambda writes `ExchangeRates/pair=CADUSD`.
+- Backend App Runner instance role can read both DynamoDB items.
+- DynamoDB gateway endpoint is attached to private subnet route tables.
+- Neon endpoint SG allows `5432` from backend App Runner SG.
+- App Runner VPC connector uses the prod private subnets and `<backend-egress-security-group-name>`.
+- Backend can connect to Neon with the JDBC URL.
+- Sign-in works through the frontend.
+- API calls work for a normal Google account.
+- Admin endpoints work only for `APP_SECURITY_ADMIN_EMAILS`.
+
+Failure modes:
+
+- `Could not assume role with OIDC`: GitHub role trust policy does not allow the repo/environment subject.
+- `Missing required env var: APP_SECURITY_JWT_AUDIENCE`: missing `PROD_GOOGLE_CLIENT_ID` in backend repo environment secrets.
+- `JDBC URL invalid port number`: credentials are in `user:password@host`; move them to `?user=...&password=...`.
+- `JWKS item not found in DynamoDB`: `AuthJwks` item is missing, wrong partition key, or App Runner role lacks `GetItem`.
+- `JWKS item is stale`: Lambda has not refreshed keys inside `APP_SECURITY_JWT_DYNAMO_MAX_STALE`.
+- DB connection timeout: PrivateLink endpoint, private DNS, security group, route table, or Neon endpoint assignment is incomplete.
+- App Runner update rolls back to public egress: the new VPC config caused app startup or health checks to fail. Check failed deployment logs, Neon endpoint status, private DNS, VPC DNS hostnames, SGs, and the bottom-most DB exception.
+
+## Dev To Prod Data Promotion
+
+Using the current dev database as the initial prod database is acceptable for a small project if it is a one-time seed, not continuous replication.
 
 Before importing dev into prod:
 
 - Keep a prod backup/restore point.
-- Decide whether prod should leave `APP_SECURITY_ALLOWED_EMAILS` empty for public self-service signup or restrict it for a private rollout.
-- Consider pruning blocked users, stale share links, and obvious test data.
+- Decide whether prod should leave `APP_SECURITY_ALLOWED_EMAILS` empty for public signup.
+- Prune obvious test users, blocked users, stale share links, and junk data.
 - Use the same Google OAuth client ID if you want existing `authId` values to remain stable.
 - After import, keep dev and prod databases separate.
-
-Do not allow dev writes to continuously replicate into prod. That would make the open dev login posture much harder to reason about.
-
-## Verification
-
-Before flipping DNS:
-
-- Confirm the JWKS Lambda writes `AuthJwks/provider=google`.
-- Confirm the FX Lambda writes `ExchangeRates/pair=CADUSD`.
-- From a temporary EC2 instance in the same VPC, run DNS lookup against the Neon hostname and confirm it resolves to private endpoint IPs.
-- Confirm App Runner health returns `UP`.
-- Sign in and confirm the backend validates JWTs without outbound internet.
-- After private DB path works, block public Neon connections.
-
-Failure modes to watch:
-
-- If JWKS is missing or stale beyond `APP_SECURITY_JWT_DYNAMO_MAX_STALE`, API auth fails.
-- If provider rotates keys and Lambda is broken, new logins can fail after old keys disappear.
-- If DynamoDB gateway endpoint is missing from the route tables, App Runner cannot read FX/JWKS with no NAT.
-- If the Neon endpoint security group does not allow `5432` from the App Runner connector security group, DB startup fails.
