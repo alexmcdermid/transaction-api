@@ -55,6 +55,7 @@ mvn test -Dtest=TradeServiceTest
 ### Development Mode (Header-based)
 - Header auth is disabled by default. For local/dev-only header auth, set `app.security.allow-header-auth=true`
 - When enabled, stateless requests can use `X-User-Id` as the authenticated principal
+- Header auth only works under the `local` or `test` Spring profiles
 - Set `app.security.dev-user-id=local-user` to avoid passing the header locally
 - Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication
 
@@ -64,12 +65,13 @@ Set the following properties:
 - `app.security.jwt.issuer-uri=https://accounts.google.com`
 - `app.security.jwt.audience=<Google client id>`
 - `app.security.allow-header-auth=false`
+- `app.security.admin-emails=<comma-separated-admin-emails>`
 
 Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
 
 ### Admin Access
 - `app.security.admin-emails` (comma-separated list)
-- If unset, the admin list falls back to `app.security.allowed-emails`
+- Admin emails are explicit; allowed users are not admins unless they are also listed here.
 
 ## Database migrations
 

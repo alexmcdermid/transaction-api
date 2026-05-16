@@ -65,9 +65,33 @@ class UserIdResolverTest {
         verify(userService, never()).ensureUserExists(anyString(), anyString());
     }
 
+    @Test
+    void doesNotTreatAllowedUserAsAdminWhenAdminListIsEmpty() {
+        configureEmails("allowed@example.com", "");
+
+        JwtAuthenticationToken auth = buildAuth("sub-4", "allowed@example.com");
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> userIdResolver.requireAdmin(auth));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void allowsConfiguredAdmin() {
+        configureEmails("allowed@example.com", "admin@example.com");
+
+        JwtAuthenticationToken auth = buildAuth("sub-5", "admin@example.com");
+
+        userIdResolver.requireAdmin(auth);
+    }
+
     private void configureAllowlist(String allowed) {
+        configureEmails(allowed, "");
+    }
+
+    private void configureEmails(String allowed, String admin) {
         ReflectionTestUtils.setField(userIdResolver, "allowedEmails", allowed);
-        ReflectionTestUtils.setField(userIdResolver, "adminEmails", "");
+        ReflectionTestUtils.setField(userIdResolver, "adminEmails", admin);
         userIdResolver.init();
     }
 

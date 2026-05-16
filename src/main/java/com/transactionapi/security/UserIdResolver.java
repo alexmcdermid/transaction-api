@@ -41,9 +41,6 @@ public class UserIdResolver {
     void init() {
         allowedEmailSet = parseEmails(allowedEmails);
         adminEmailSet = parseEmails(adminEmails);
-        if (adminEmailSet.isEmpty()) {
-            adminEmailSet = allowedEmailSet;
-        }
     }
 
     public String requireUserId(Authentication authentication) {

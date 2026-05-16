@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -18,11 +20,17 @@ import org.springframework.lang.NonNull;
 @Component
 public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
 
+    private final Environment environment;
+
     @Value("${app.security.allow-header-auth:false}")
     private boolean allowHeaderAuth;
 
     @Value("${app.security.header-name:X-User-Id}")
     private String headerName;
+
+    public HeaderUserAuthenticationFilter(Environment environment) {
+        this.environment = environment;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -31,7 +39,9 @@ public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     )
             throws ServletException, IOException {
-        if (allowHeaderAuth && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (allowHeaderAuth
+                && isHeaderAuthProfile()
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
             String userId = request.getHeader(headerName);
             if (StringUtils.hasText(userId)) {
                 var authentication = new UsernamePasswordAuthenticationToken(userId.trim(), null, List.of());
@@ -40,5 +50,9 @@ public class HeaderUserAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isHeaderAuthProfile() {
+        return environment.acceptsProfiles(Profiles.of("local", "test"));
     }
 }
