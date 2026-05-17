@@ -22,6 +22,9 @@
 
 ### Public
 - `GET /api/v1/health` — basic health check
+- `GET /api/v1/auth/csrf` — returns the CSRF header name and token for browser session requests
+- `POST /api/v1/auth/login` — validates a Google credential and creates the session cookie
+- `POST /api/v1/auth/logout` — invalidates the session cookie
 
 ### Authenticated
 - `GET /api/v1/trades` — list trades for the caller
@@ -52,6 +55,17 @@ mvn test -Dtest=TradeServiceTest
 
 ## Authentication
 
+### Browser Session Mode
+The frontend posts the Google credential to `POST /api/v1/auth/login`. The backend validates the credential with the configured `JwtDecoder`, enforces the allowed-email list, creates/loads the user, and stores an `AuthenticatedUserPrincipal` in the HTTP session.
+
+Session cookies are configured as:
+- `HttpOnly`
+- `Secure` by default (`APP_SESSION_COOKIE_SECURE=false` only for local HTTP)
+- `SameSite=Lax`
+- timeout from `APP_SESSION_TIMEOUT` (default `PT2H`)
+
+CSRF protection is enabled for unsafe cookie-session requests. Browser clients should fetch `GET /api/v1/auth/csrf` and send the returned header on `POST`, `PUT`, `PATCH`, and `DELETE` requests.
+
 ### Development Mode (Header-based)
 - Header auth is disabled by default. For local/dev-only header auth, set `app.security.allow-header-auth=true`
 - When enabled, stateless requests can use `X-User-Id` as the authenticated principal
@@ -59,7 +73,7 @@ mvn test -Dtest=TradeServiceTest
 - Set `app.security.dev-user-id=local-user` to avoid passing the header locally
 - Health endpoint is open (`/api/v1/health` and `/`); all other endpoints require authentication
 
-### Production Mode (JWT)
+### Production Mode
 Set the following properties:
 - `app.security.jwt.enabled=true`
 - `app.security.jwt.issuer-uri=https://accounts.google.com`
@@ -67,7 +81,7 @@ Set the following properties:
 - `app.security.allow-header-auth=false`
 - `app.security.admin-emails=<comma-separated-admin-emails>`
 
-Spring Security validates bearer tokens and uses the JWT `sub` (or `email`) as the caller id.
+Login validates the Google credential and stores the Google `sub`, email, and name in the server session. Bearer token authentication is still supported for non-browser clients, and CSRF is skipped for explicit `Authorization` header requests.
 
 ### Admin Access
 - `app.security.admin-emails` (comma-separated list)
@@ -101,6 +115,8 @@ Optional:
 - `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
 - `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
 - `APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H`
+- `APP_SESSION_TIMEOUT=PT2H`
+- `APP_SESSION_COOKIE_SECURE=true`
 
 ## CI/CD (GitHub Actions)
 

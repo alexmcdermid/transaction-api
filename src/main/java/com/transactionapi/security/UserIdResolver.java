@@ -55,6 +55,11 @@ public class UserIdResolver {
                 return email;
             }
         }
+        if (authentication != null
+                && authentication.getPrincipal() instanceof AuthenticatedUserPrincipal principal
+                && StringUtils.hasText(principal.authId())) {
+            return principal.authId();
+        }
         if (authentication != null && authentication.getPrincipal() instanceof String principal
                 && StringUtils.hasText(principal)) {
             return principal;
@@ -94,6 +99,10 @@ public class UserIdResolver {
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             return jwtAuth.getToken().getClaimAsString("email");
         }
+        if (authentication != null
+                && authentication.getPrincipal() instanceof AuthenticatedUserPrincipal principal) {
+            return principal.email();
+        }
         if (authentication != null && authentication.getPrincipal() instanceof String principal) {
             if (principal.contains("@")) {
                 return principal;
@@ -112,6 +121,11 @@ public class UserIdResolver {
             if (StringUtils.hasText(email)) {
                 return email;
             }
+        }
+        if (authentication != null
+                && authentication.getPrincipal() instanceof AuthenticatedUserPrincipal principal
+                && StringUtils.hasText(principal.authId())) {
+            return principal.authId();
         }
         if (authentication != null && authentication.getPrincipal() instanceof String principal
                 && StringUtils.hasText(principal)) {

@@ -46,15 +46,16 @@ Not included:
 
 - Combining frontend and backend into one container.
 - Combining frontend and backend into one App Runner per environment.
-- Moving to first-party sessions.
 
 ## Shared Auth Model
 
-The app keeps the current Google OAuth frontend model:
+The app uses a first-party session model:
 
 - The browser talks to Google directly.
-- The frontend sends the Google ID token to the backend as a bearer token.
-- The backend validates the token locally using Google JWKS mirrored into DynamoDB.
+- The frontend sends the Google credential once to `POST /api/v1/auth/login`.
+- The backend validates the credential locally using Google JWKS mirrored into DynamoDB.
+- The backend stores the authenticated principal in an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie.
+- Browser unsafe methods use the CSRF token from `GET /api/v1/auth/csrf`.
 
 For this small project, shared auth metadata is acceptable:
 
@@ -84,6 +85,8 @@ PROD_FRONTEND_SERVICE_ARN=arn:aws:apprunner:<region>:<account-id>:service/<servi
 PROD_API_BASE_URL=<prod-api-origin>/api/v1
 PROD_GOOGLE_CLIENT_ID=<google-web-client-id>
 PROD_ADMIN_EMAILS=<comma-separated-admin-emails>
+PROD_PUBLIC_ORIGIN=<prod-frontend-origin>
+PROD_PUBLIC_HOST_ALLOWLIST=<prod-frontend-origin-host>,<prod-root-origin-host-if-forwarded-or-supported>
 ```
 
 Dev environment secrets use the same names with `DEV_`.
@@ -222,7 +225,7 @@ Use this order:
    - `AWS_REGION`
    - `AWS_ROLE_ARN`
    - `PROD_ECR_*_REPO`
-   - frontend also needs `PROD_API_BASE_URL` and `PROD_GOOGLE_CLIENT_ID`
+   - frontend also needs `PROD_API_BASE_URL`, `PROD_GOOGLE_CLIENT_ID`, and `PROD_PUBLIC_ORIGIN`
 3. Run prod deploy workflow once.
 4. It should build and push the ECR image.
 5. If `PROD_*_SERVICE_ARN` is missing, the workflow will fail after the image push. That is expected.
@@ -257,6 +260,8 @@ VITE_GOOGLE_CLIENT_ID=<google-web-client-id>
 VITE_ADMIN_EMAILS=<comma-separated-admin-emails>
 VITE_USE_HEADER_AUTH=false
 VITE_USER_ID=
+VITE_PUBLIC_ORIGIN=<prod-frontend-origin>
+VITE_PUBLIC_HOST_ALLOWLIST=<prod-frontend-origin-host>,<prod-root-origin-host-if-forwarded-or-supported>
 ```
 
 ### Backend
@@ -304,6 +309,8 @@ APP_SECURITY_JWT_DYNAMO_KEY=google
 APP_SECURITY_JWT_DYNAMO_JWK_SET_ATTRIBUTE=jwks
 APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE=expiresAt
 APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H
+APP_SESSION_TIMEOUT=PT2H
+APP_SESSION_COOKIE_SECURE=true
 
 APP_SECURITY_ALLOWED_EMAILS=
 APP_SECURITY_ADMIN_EMAILS=<comma-separated-admin-emails>
