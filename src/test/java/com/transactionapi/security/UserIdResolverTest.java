@@ -50,7 +50,7 @@ class UserIdResolverTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> userIdResolver.requireUserId(auth));
 
-        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         verify(userService).ensureUserExists("sub-2", "blocked@example.com");
     }
 

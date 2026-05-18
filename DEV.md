@@ -56,7 +56,7 @@ mvn test -Dtest=TradeServiceTest
 ## Authentication
 
 ### Browser Session Mode
-The frontend posts the Google credential to `POST /api/v1/auth/login`. The backend validates the credential with the configured `JwtDecoder`, enforces the allowed-email list, creates/loads the user, and stores an `AuthenticatedUserPrincipal` in the HTTP session.
+The frontend posts the Google credential to `POST /api/v1/auth/login`. The backend validates the credential with the configured `JwtDecoder`, enforces the allowed-email list only when one is configured, creates/loads the user, and stores an `AuthenticatedUserPrincipal` in the HTTP session.
 
 Session cookies are configured as:
 - `HttpOnly`
@@ -68,7 +68,7 @@ Keep frontend and backend deployments same-site for browser session auth. `https
 
 CSRF protection is enabled for unsafe cookie-session requests. Browser clients should fetch `GET /api/v1/auth/csrf` and send the returned header on `POST`, `PUT`, `PATCH`, and `DELETE` requests.
 
-Invalid, expired, or unverifiable Google credentials return `401 Invalid credential`. Logout invalidates the server session and clears the session and CSRF cookies.
+Invalid, expired, or unverifiable Google credentials return `401 Invalid credential`. Dev may set `APP_SECURITY_ALLOWED_EMAILS`; valid Google accounts outside that dev allowlist return `403 Email not allowed`, and the frontend keeps the user in guest mode with the repo-owner contact message. Logout invalidates the server session and clears the session and CSRF cookies.
 
 ### Development Mode (Header-based)
 - Header auth is disabled by default. For local/dev-only header auth, set `app.security.allow-header-auth=true`
@@ -83,6 +83,7 @@ Set the following properties:
 - `app.security.jwt.issuer-uri=https://accounts.google.com`
 - `app.security.jwt.audience=<Google client id>`
 - `app.security.allow-header-auth=false`
+- `app.security.allowed-emails=` (empty; prod allows all Google accounts with isolated per-user data)
 - `app.security.admin-emails=<comma-separated-admin-emails>`
 
 Login validates the Google credential and stores the Google `sub`, email, and name in the server session. Bearer token authentication is still supported for non-browser clients, and CSRF is skipped for explicit `Authorization` header requests.
@@ -116,7 +117,6 @@ Required:
 - `APP_FX_DYNAMO_TABLE=ExchangeRates`
 
 Optional:
-- `APP_SECURITY_ALLOWED_EMAILS` (comma-separated allowlist)
 - `APP_SECURITY_ADMIN_EMAILS` (comma-separated admin allowlist)
 - `APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H`
 - `APP_SESSION_TIMEOUT=PT2H`
@@ -151,13 +151,14 @@ DEV_CORS_ALLOWED_ORIGINS=https://dev.tradelog.ca
 - `PROD_DATABASE_URL`
 - `PROD_CORS_ALLOWED_ORIGINS`
 - `PROD_GOOGLE_CLIENT_ID`
-- `PROD_ALLOWED_EMAILS` (optional)
 - `PROD_ADMIN_EMAILS` (optional)
 
 For the current production frontend domain:
 ```text
 PROD_CORS_ALLOWED_ORIGINS=https://www.tradelog.ca
 ```
+
+Do not set a prod allowed-email secret. Prod intentionally leaves `APP_SECURITY_ALLOWED_EMAILS` empty so all Google accounts are allowed and data isolation stays per user.
 
 If `https://tradelog.ca` also reaches the frontend app, include it as a second allowed origin.
 

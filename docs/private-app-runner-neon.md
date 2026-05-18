@@ -115,11 +115,10 @@ PROD_BACKEND_SERVICE_ARN=arn:aws:apprunner:<region>:<account-id>:service/<servic
 PROD_DATABASE_URL=<jdbc-neon-url>
 PROD_CORS_ALLOWED_ORIGINS=<prod-frontend-origin>,<prod-root-origin-if-forwarded-or-supported>
 PROD_GOOGLE_CLIENT_ID=<google-web-client-id>
-PROD_ALLOWED_EMAILS=<optional-comma-separated-allowlist>
 PROD_ADMIN_EMAILS=<comma-separated-admin-emails>
 ```
 
-Leave `PROD_ALLOWED_EMAILS` empty for public Google signup.
+Do not set `PROD_ALLOWED_EMAILS`. Prod intentionally leaves `APP_SECURITY_ALLOWED_EMAILS` empty so all Google accounts are allowed and data isolation stays per user. Keep the allowed-email gate for dev only.
 
 Current backend CORS values:
 
@@ -740,6 +739,8 @@ Before blocking public Neon access:
 - Backend can connect to Neon with the JDBC URL.
 - Sign-in works through the frontend.
 - Bad Google credentials return `401 Invalid credential`.
+- Dev only: valid Google accounts outside `APP_SECURITY_ALLOWED_EMAILS` return `403 Email not allowed` and remain in frontend guest mode with an allowlist contact message.
+- Prod has `APP_SECURITY_ALLOWED_EMAILS` empty, so any valid Google account can sign in to isolated per-user data.
 - Logout clears the session; signing back in creates a fresh session.
 - API calls work for a normal Google account.
 - Admin endpoints work only for `APP_SECURITY_ADMIN_EMAILS`.
@@ -761,7 +762,7 @@ Using the current dev database as the initial prod database is acceptable for a 
 Before importing dev into prod:
 
 - Keep a prod backup/restore point.
-- Decide whether prod should leave `APP_SECURITY_ALLOWED_EMAILS` empty for public signup.
+- Ensure prod leaves `APP_SECURITY_ALLOWED_EMAILS` empty for public signup.
 - Prune obvious test users, blocked users, stale share links, and junk data.
 - Use the same Google OAuth client ID if you want existing `authId` values to remain stable.
 - After import, keep dev and prod databases separate.

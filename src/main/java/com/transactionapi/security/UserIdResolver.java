@@ -87,11 +87,11 @@ public class UserIdResolver {
         String email = resolveEmail(authentication);
         if (!StringUtils.hasText(email)) {
             registerBlockedUser(authentication, null);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email not allowed");
         }
         if (!allowedEmailSet.contains(email.toLowerCase())) {
             registerBlockedUser(authentication, email);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email not allowed");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email not allowed");
         }
     }
 

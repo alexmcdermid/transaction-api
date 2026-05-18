@@ -34,7 +34,6 @@ jobs:
           SERVICE_ARN: ${{ secrets.PROD_BACKEND_SERVICE_ARN }}
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.PROD_ECR_TRANSACTION_API_REPO }}:${{ github.sha }}
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-          APP_SECURITY_ALLOWED_EMAILS: ${{ secrets.PROD_ALLOWED_EMAILS }}
           APP_SECURITY_ADMIN_EMAILS: ${{ secrets.PROD_ADMIN_EMAILS }}
           APP_CORS_ALLOWED_ORIGINS: ${{ secrets.PROD_CORS_ALLOWED_ORIGINS }}
           APP_SECURITY_JWT_ENABLED: "true"
@@ -90,7 +89,6 @@ jobs:
           }
           
           optional = {
-              "APP_SECURITY_ALLOWED_EMAILS": optional("APP_SECURITY_ALLOWED_EMAILS"),
               "APP_SECURITY_ADMIN_EMAILS": optional("APP_SECURITY_ADMIN_EMAILS"),
           }
           env.update({k: v for k, v in optional.items() if v})
