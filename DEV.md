@@ -61,10 +61,14 @@ The frontend posts the Google credential to `POST /api/v1/auth/login`. The backe
 Session cookies are configured as:
 - `HttpOnly`
 - `Secure` by default (`APP_SESSION_COOKIE_SECURE=false` only for local HTTP)
-- `SameSite=Lax`
+- `SameSite=Lax` by default (`APP_SESSION_COOKIE_SAME_SITE=lax`)
 - timeout from `APP_SESSION_TIMEOUT` (default `PT2H`)
 
+Keep frontend and backend deployments same-site for browser session auth. `https://www.tradelog.ca` or `https://dev.tradelog.ca` talking to an API on another `*.tradelog.ca` hostname is same-site and works with `SameSite=Lax`. If the API is deployed on a different registrable domain, set `APP_SESSION_COOKIE_SAME_SITE=none`, keep `APP_SESSION_COOKIE_SECURE=true`, and re-check the CORS/CSRF deployment path deliberately.
+
 CSRF protection is enabled for unsafe cookie-session requests. Browser clients should fetch `GET /api/v1/auth/csrf` and send the returned header on `POST`, `PUT`, `PATCH`, and `DELETE` requests.
+
+Invalid, expired, or unverifiable Google credentials return `401 Invalid credential`. Logout invalidates the server session and clears the session and CSRF cookies.
 
 ### Development Mode (Header-based)
 - Header auth is disabled by default. For local/dev-only header auth, set `app.security.allow-header-auth=true`
@@ -117,6 +121,7 @@ Optional:
 - `APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H`
 - `APP_SESSION_TIMEOUT=PT2H`
 - `APP_SESSION_COOKIE_SECURE=true`
+- `APP_SESSION_COOKIE_SAME_SITE=lax`
 
 ## CI/CD (GitHub Actions)
 
@@ -133,6 +138,11 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `DEV_ADMIN_EMAILS` (optional)
 - `DEV_GOOGLE_CLIENT_ID`
 
+For the current dev frontend domain:
+```text
+DEV_CORS_ALLOWED_ORIGINS=https://dev.tradelog.ca
+```
+
 ### Required GitHub Secrets (Prod)
 - `AWS_REGION`
 - `AWS_ROLE_ARN`
@@ -143,6 +153,13 @@ CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod d
 - `PROD_GOOGLE_CLIENT_ID`
 - `PROD_ALLOWED_EMAILS` (optional)
 - `PROD_ADMIN_EMAILS` (optional)
+
+For the current production frontend domain:
+```text
+PROD_CORS_ALLOWED_ORIGINS=https://www.tradelog.ca
+```
+
+If `https://tradelog.ca` also reaches the frontend app, include it as a second allowed origin.
 
 ### OIDC Permissions
 Role permissions for App Runner deploys must include:

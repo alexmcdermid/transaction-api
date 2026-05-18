@@ -21,6 +21,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.authentication.logout.CookieClearingLogoutHandler;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
@@ -74,7 +75,12 @@ public class AuthController {
         JwtDecoder decoder = jwtDecoderProvider.getIfAvailable(() -> {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "JWT login is not configured");
         });
-        Jwt jwt = decoder.decode(loginRequest.credential());
+        Jwt jwt;
+        try {
+            jwt = decoder.decode(loginRequest.credential());
+        } catch (JwtException ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credential", ex);
+        }
         JwtAuthenticationToken jwtAuthentication = new JwtAuthenticationToken(jwt);
         String authId = userIdResolver.requireUserId(jwtAuthentication);
         String email = userIdResolver.resolveEmail(jwtAuthentication);

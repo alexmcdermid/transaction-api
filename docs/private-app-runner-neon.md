@@ -91,6 +91,18 @@ PROD_PUBLIC_HOST_ALLOWLIST=<prod-frontend-origin-host>,<prod-root-origin-host-if
 
 Dev environment secrets use the same names with `DEV_`.
 
+Current frontend values:
+
+```text
+DEV_PUBLIC_ORIGIN=https://dev.tradelog.ca
+DEV_PUBLIC_HOST_ALLOWLIST=dev.tradelog.ca
+
+PROD_PUBLIC_ORIGIN=https://www.tradelog.ca
+PROD_PUBLIC_HOST_ALLOWLIST=www.tradelog.ca
+```
+
+If `https://tradelog.ca` reaches the React SSR app instead of redirecting before the app, add `tradelog.ca` to `PROD_PUBLIC_HOST_ALLOWLIST`.
+
 ### Backend Repo: `transaction-api`
 
 Prod environment secrets:
@@ -108,6 +120,15 @@ PROD_ADMIN_EMAILS=<comma-separated-admin-emails>
 ```
 
 Leave `PROD_ALLOWED_EMAILS` empty for public Google signup.
+
+Current backend CORS values:
+
+```text
+DEV_CORS_ALLOWED_ORIGINS=https://dev.tradelog.ca
+PROD_CORS_ALLOWED_ORIGINS=https://www.tradelog.ca
+```
+
+If `https://tradelog.ca` reaches the frontend app, add `https://tradelog.ca` to `PROD_CORS_ALLOWED_ORIGINS`.
 
 ## Neon JDBC URL Format
 
@@ -311,10 +332,15 @@ APP_SECURITY_JWT_DYNAMO_EXPIRES_AT_ATTRIBUTE=expiresAt
 APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H
 APP_SESSION_TIMEOUT=PT2H
 APP_SESSION_COOKIE_SECURE=true
+APP_SESSION_COOKIE_SAME_SITE=lax
 
 APP_SECURITY_ALLOWED_EMAILS=
 APP_SECURITY_ADMIN_EMAILS=<comma-separated-admin-emails>
 ```
+
+Keep the frontend and API under the same registrable domain for the browser session flow. For example, `www.tradelog.ca` or `dev.tradelog.ca` calling an API on another `*.tradelog.ca` hostname is same-site and works with `SameSite=Lax`. If the API lives on a different registrable domain, use `APP_SESSION_COOKIE_SAME_SITE=none` with `APP_SESSION_COOKIE_SECURE=true` and retest login plus unsafe API calls end-to-end.
+
+The frontend never stores the Google credential or bearer token in local storage. It exchanges the credential once at `/api/v1/auth/login`, then uses `credentials: include` with the first-party session cookie. Unsafe browser requests must include the CSRF header returned by `/api/v1/auth/csrf`; frontend code caches that token and clears it on logout.
 
 ## Public DNS And Custom Domains
 
@@ -713,6 +739,8 @@ Before blocking public Neon access:
 - App Runner VPC connector uses the prod private subnets and `<backend-egress-security-group-name>`.
 - Backend can connect to Neon with the JDBC URL.
 - Sign-in works through the frontend.
+- Bad Google credentials return `401 Invalid credential`.
+- Logout clears the session; signing back in creates a fresh session.
 - API calls work for a normal Google account.
 - Admin endpoints work only for `APP_SECURITY_ADMIN_EMAILS`.
 
