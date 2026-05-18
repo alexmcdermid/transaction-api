@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -99,6 +100,7 @@ class ShareLinkControllerTest {
 
         mockMvc.perform(post(ApiPaths.SHARES)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(csrf())
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("abc12345"))
@@ -120,6 +122,7 @@ class ShareLinkControllerTest {
 
         mockMvc.perform(post(ApiPaths.SHARES)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(csrf())
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
 
@@ -201,7 +204,8 @@ class ShareLinkControllerTest {
     void deleteShareLink_authenticated_shouldSucceed() throws Exception {
         doNothing().when(shareLinkService).deleteShareLink("abc12345", USER_ID);
 
-        mockMvc.perform(delete(ApiPaths.SHARES + "/abc12345"))
+        mockMvc.perform(delete(ApiPaths.SHARES + "/abc12345")
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(shareLinkService).deleteShareLink("abc12345", USER_ID);
@@ -209,7 +213,8 @@ class ShareLinkControllerTest {
 
     @Test
     void deleteShareLink_unauthenticated_shouldFail() throws Exception {
-        mockMvc.perform(delete(ApiPaths.SHARES + "/abc12345"))
+        mockMvc.perform(delete(ApiPaths.SHARES + "/abc12345")
+                        .with(csrf()))
                 .andExpect(status().isUnauthorized());
 
         verify(shareLinkService, never()).deleteShareLink(anyString(), anyString());
