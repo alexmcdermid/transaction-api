@@ -3,19 +3,19 @@
 This is the current deployment model. We are deliberately keeping four App Runner services for now:
 
 ```text
-dev frontend App Runner   -> public ingress, no VPC connector
-dev backend App Runner    -> public ingress, VPC egress, no NAT
-prod frontend App Runner  -> public ingress, no VPC connector
-prod backend App Runner   -> public ingress, VPC egress, no NAT
+dev frontend App Runner   -> public ingress, public egress, no VPC connector
+dev backend App Runner    -> public ingress, public egress, public Neon connection
+prod frontend App Runner  -> public ingress, public egress, no VPC connector
+prod backend App Runner   -> public ingress, VPC egress, no NAT, Neon PrivateLink
 ```
 
-Only backend services need private networking. The frontend never talks directly to Neon or DynamoDB.
+Only the prod backend uses the private Neon path. Dev App Runner services use non-private Neon connectivity. The frontend never talks directly to Neon or DynamoDB.
 
 ```text
 Browser
   -> frontend App Runner custom domain
   -> backend App Runner custom domain
-  -> backend App Runner VPC connector
+  -> prod backend App Runner VPC connector
   -> Neon PrivateLink endpoint for Postgres
   -> DynamoDB gateway endpoint for FX rates and Google JWKS
 
@@ -25,7 +25,39 @@ EventBridge
   -> write latest documents to DynamoDB
 ```
 
-The backend remains publicly reachable for API traffic. The VPC connector only changes backend outbound traffic. With no NAT, backend runtime calls must be limited to private/VPC-reachable services such as Neon PrivateLink and DynamoDB.
+The backend remains publicly reachable for API traffic. The prod VPC connector only changes prod backend outbound traffic. With no NAT, prod backend runtime calls must be limited to private/VPC-reachable services such as Neon PrivateLink and DynamoDB.
+
+## Cost Notes
+
+Current cost model:
+
+- Four App Runner services stay deployed: dev/prod frontend and dev/prod backend.
+- Dev App Runner services use public egress and non-private Neon, so dev does not create Neon PrivateLink endpoint cost in AWS.
+- Prod backend uses Neon PrivateLink and the DynamoDB gateway endpoint. Prod frontend stays public egress and does not need a VPC connector.
+- There is no NAT Gateway, load balancer, API Gateway, ECS, or EKS in the current design.
+
+Main monthly cost drivers:
+
+- **App Runner:** usually the largest AWS baseline. You pay for provisioned memory while services are deployed, plus vCPU while services are actively processing requests. At low traffic, right-sizing CPU/memory and pausing unused dev services matter more than request volume.
+- **Neon PrivateLink:** prod-only. The current low-cost layout uses three Neon interface endpoints, each in one subnet/AZ. Adding more subnets/AZs improves availability but increases endpoint ENI-hour cost.
+- **Neon databases:** billed separately by Neon. All three Neon databases can still incur compute, storage, history/restore, branch, and transfer costs. Dev being non-private only removes AWS PrivateLink cost; it does not remove Neon compute/storage cost.
+- **DynamoDB:** the shared `ExchangeRates` and `AuthJwks` tables should stay near-zero for this app. The DynamoDB gateway endpoint itself has no additional charge.
+- **Lambda and EventBridge:** the JWKS and FX scheduled jobs should be free or near-free at this schedule and payload size.
+- **ECR:** private image storage is cheap but grows if old images are retained. Same-region pulls from ECR to App Runner do not add transfer cost.
+- **CloudWatch Logs:** log ingestion/storage can creep if debug logging is left on or retention is unlimited.
+- **DNS:** App Runner custom domains and ACM certificates do not add a separate App Runner charge. Route 53 only matters if DNS is hosted there; otherwise DNS cost sits with the external DNS provider.
+
+Cost levers:
+
+1. Pause dev App Runner services when they are not needed.
+2. Use the smallest App Runner CPU/memory shape that runs frontend and backend comfortably.
+3. Keep Neon PrivateLink prod-only.
+4. Keep one subnet/AZ per Neon endpoint until availability matters more than endpoint cost.
+5. Add ECR lifecycle policies for old images.
+6. Set CloudWatch log retention.
+7. Keep NAT Gateway out of this design.
+
+For the budget alert and App Runner auto-pause guardrail, see [AWS Budget Guardrail Runbook](aws-budget-guardrail.md).
 
 ## Deployment Identifiers
 
@@ -296,9 +328,10 @@ Configuration:
 - Source: ECR image.
 - Port: `8080`.
 - Incoming traffic: public.
-- Outgoing traffic: custom VPC connector.
-- VPC connector: private subnets and `<backend-egress-security-group-name>` for prod.
-- No NAT Gateway.
+- Dev outgoing traffic: default public networking, using a non-private Neon connection.
+- Prod outgoing traffic: custom VPC connector, using Neon PrivateLink.
+- Prod VPC connector: private subnets and `<backend-egress-security-group-name>`.
+- Prod has no NAT Gateway.
 - Instance role: DynamoDB read role.
 
 Do not set incoming traffic to private for the backend API unless an API Gateway/private client design is introduced. The frontend needs to reach the backend API over the public App Runner/custom domain.
@@ -539,8 +572,8 @@ Policy:
 
 Use the same AWS region for:
 
-- Backend App Runner service.
-- Backend App Runner VPC connector.
+- Prod backend App Runner service.
+- Prod backend App Runner VPC connector.
 - VPC endpoints.
 - Neon project.
 
@@ -580,7 +613,7 @@ Create a security group:
 <backend-egress-security-group-name>
 ```
 
-Attach it to the backend App Runner VPC connector.
+Attach it to the prod backend App Runner VPC connector.
 
 Outbound rule:
 
@@ -635,12 +668,32 @@ After endpoint creation, verify each Neon endpoint uses:
 
 ```text
 VPC: <prod-vpc-name>
-Subnets: the three prod private subnets
+Subnets: the selected prod private subnet(s)
 Security group: neon-privatelink-endpoint-sg
 Status: Available
 ```
 
 If the endpoints show `Pending` after a modification, wait for them to return to `Available` before retrying App Runner. If they remain `Pending` for more than 10-15 minutes, re-run the Neon endpoint assignment commands.
+
+### Temporary Low-Cost Neon Endpoint Layout
+
+Current setup:
+
+- Keep all three Neon PrivateLink endpoint service mappings required for the AWS region.
+- Provision each Neon interface endpoint in one shared private subnet/AZ for now to reduce endpoint cost.
+- Keep the backend App Runner VPC connector using that same subnet while this low-cost layout is active.
+- Keep the DynamoDB gateway endpoint as-is.
+
+This is a cost reduction, not a security change. The database remains private through Neon PrivateLink, with the same authentication and TLS behavior. The tradeoff is availability: if the selected AZ/subnet has an issue, App Runner -> Neon private DB connectivity can fail until the AZ recovers or additional subnets are added back.
+
+To switch back to the higher-availability setup:
+
+1. AWS Console -> VPC -> Endpoints.
+2. Open each Neon interface endpoint.
+3. Modify the endpoint subnets.
+4. Re-enable the other private subnets/AZs for each Neon endpoint.
+5. Wait until all Neon endpoints return to `Available`.
+6. Confirm the App Runner VPC connector includes the same private subnets/AZs.
 
 ### Assign Endpoints In Neon
 
@@ -704,9 +757,11 @@ The connector must use:
 
 ```text
 VPC: <prod-vpc-name> / <prod-vpc-id>
-Subnets: the prod private subnets associated with <prod-private-route-table-name>
+Subnets: the prod private subnet(s) associated with <prod-private-route-table-name>
 Security group: <backend-egress-security-group-name> / <backend-egress-security-group-id>
 ```
+
+While the temporary low-cost Neon layout is active, include the same private subnet/AZ that contains the Neon endpoint ENIs.
 
 If App Runner rolls back to public egress after saving the VPC connector, treat that as an app startup failure. App Runner applies the network change, the container fails health/startup, and App Runner restores the previous config. Look at the failed deployment logs.
 
@@ -730,6 +785,7 @@ Before blocking public Neon access:
 - `<prod-vpc-name>` has DNS resolution and DNS hostnames enabled.
 - All three Neon interface endpoints are `Available`.
 - All three Neon interface endpoints have private DNS enabled.
+- Temporary low-cost layout only: all three Neon interface endpoints use the same selected private subnet/AZ, and the App Runner VPC connector includes that subnet.
 - JWKS Lambda writes `AuthJwks/provider=google`.
 - FX Lambda writes `ExchangeRates/pair=CADUSD`.
 - Backend App Runner instance role can read both DynamoDB items.

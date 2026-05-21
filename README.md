@@ -33,3 +33,5 @@ Trades are stored per-user in PostgreSQL. Authentication is handled by validatin
 See [DEV.md](DEV.md) for setup instructions, API documentation, and deployment details.
 
 For the target private App Runner deployment, see [Private App Runner + Neon Deployment](docs/private-app-runner-neon.md).
+
+For AWS budget alerts and App Runner auto-pause guardrails, see [AWS Budget Guardrail Runbook](docs/aws-budget-guardrail.md).
