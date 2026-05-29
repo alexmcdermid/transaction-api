@@ -7,11 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
+import com.transactionapi.constants.DashboardWidget;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.UserPreferencesRequest;
+import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -42,7 +45,12 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.pnlDisplayMode").value("PNL"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("CLOSED_AT"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("DESC"))
-                .andExpect(jsonPath("$.showTradeHistory").value(false));
+                .andExpect(jsonPath("$.showTradeHistory").value(false))
+                .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
+                .andExpect(jsonPath("$.dashboardWidgets[1]").value("BEST_MONTH"))
+                .andExpect(jsonPath("$.dashboardWidgets[2]").value("BEST_DAY"))
+                .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
+                .andExpect(jsonPath("$.taxPersonalRate").value(50.00));
     }
 
     @Test
@@ -52,7 +60,10 @@ class UserPreferencesControllerTest {
                 PnlDisplayMode.PERCENT,
                 TradeSortField.SYMBOL,
                 TradeSortDirection.ASC,
-                true
+                true,
+                List.of(DashboardWidget.TOTAL_REALIZED, DashboardWidget.TAX_OWED),
+                new BigDecimal("50.00"),
+                new BigDecimal("38.50")
         );
 
         mockMvc.perform(
@@ -65,7 +76,11 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.themeMode").value("DARK"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
-                .andExpect(jsonPath("$.showTradeHistory").value(true));
+                .andExpect(jsonPath("$.showTradeHistory").value(true))
+                .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
+                .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
+                .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
+                .andExpect(jsonPath("$.taxPersonalRate").value(38.50));
 
         mockMvc.perform(
                         get(ApiPaths.USER_PREFERENCES)
@@ -76,7 +91,11 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.pnlDisplayMode").value("PERCENT"))
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
-                .andExpect(jsonPath("$.showTradeHistory").value(true));
+                .andExpect(jsonPath("$.showTradeHistory").value(true))
+                .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
+                .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
+                .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
+                .andExpect(jsonPath("$.taxPersonalRate").value(38.50));
     }
 
     @Test
