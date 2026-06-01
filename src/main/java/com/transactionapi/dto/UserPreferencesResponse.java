@@ -1,6 +1,7 @@
 package com.transactionapi.dto;
 
 import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
@@ -16,6 +17,7 @@ public record UserPreferencesResponse(
         TradeSortDirection defaultTradeSortDirection,
         boolean showTradeHistory,
         List<DashboardWidget> dashboardWidgets,
+        Currency displayCurrency,
         BigDecimal taxCapitalGainsRate,
         BigDecimal taxPersonalRate
 ) {
@@ -36,6 +38,7 @@ public record UserPreferencesResponse(
                 defaultTradeSortDirection,
                 user.isShowTradeHistory(),
                 DashboardWidget.fromStorage(user.getDashboardWidgets()),
+                user.getDisplayCurrency() != null ? user.getDisplayCurrency() : Currency.USD,
                 user.getTaxCapitalGainsRate(),
                 user.getTaxPersonalRate()
         );

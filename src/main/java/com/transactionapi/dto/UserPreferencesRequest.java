@@ -1,6 +1,7 @@
 package com.transactionapi.dto;
 
 import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
@@ -18,6 +19,7 @@ public record UserPreferencesRequest(
         TradeSortDirection defaultTradeSortDirection,
         Boolean showTradeHistory,
         List<@NotNull DashboardWidget> dashboardWidgets,
+        Currency displayCurrency,
         @DecimalMin("0.00") @DecimalMax("100.00") BigDecimal taxCapitalGainsRate,
         @DecimalMin("1.00") @DecimalMax("100.00") BigDecimal taxPersonalRate
 ) {

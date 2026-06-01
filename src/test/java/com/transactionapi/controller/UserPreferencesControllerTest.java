@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.DashboardWidget;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
@@ -49,6 +50,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("BEST_MONTH"))
                 .andExpect(jsonPath("$.dashboardWidgets[2]").value("BEST_DAY"))
+                .andExpect(jsonPath("$.displayCurrency").value("USD"))
                 .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
                 .andExpect(jsonPath("$.taxPersonalRate").value(50.00));
     }
@@ -62,6 +64,7 @@ class UserPreferencesControllerTest {
                 TradeSortDirection.ASC,
                 true,
                 List.of(DashboardWidget.TOTAL_REALIZED, DashboardWidget.TAX_OWED),
+                Currency.CAD,
                 new BigDecimal("50.00"),
                 new BigDecimal("38.50")
         );
@@ -79,6 +82,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.showTradeHistory").value(true))
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
+                .andExpect(jsonPath("$.displayCurrency").value("CAD"))
                 .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
                 .andExpect(jsonPath("$.taxPersonalRate").value(38.50));
 
@@ -94,6 +98,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.showTradeHistory").value(true))
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
+                .andExpect(jsonPath("$.displayCurrency").value("CAD"))
                 .andExpect(jsonPath("$.taxCapitalGainsRate").value(50.00))
                 .andExpect(jsonPath("$.taxPersonalRate").value(38.50));
     }

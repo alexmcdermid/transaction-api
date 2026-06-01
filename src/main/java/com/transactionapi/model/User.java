@@ -1,6 +1,7 @@
 package com.transactionapi.model;
 
 import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
@@ -59,6 +60,10 @@ public class User {
 
     @Column(name = "dashboard_widgets", nullable = false, length = 256)
     private String dashboardWidgets = DashboardWidget.defaultStorageValue();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "display_currency", nullable = false, length = 3)
+    private Currency displayCurrency = Currency.USD;
 
     @Column(name = "tax_capital_gains_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal taxCapitalGainsRate = new BigDecimal("50.00");
@@ -158,6 +163,14 @@ public class User {
 
     public void setDashboardWidgets(String dashboardWidgets) {
         this.dashboardWidgets = dashboardWidgets;
+    }
+
+    public Currency getDisplayCurrency() {
+        return displayCurrency;
+    }
+
+    public void setDisplayCurrency(Currency displayCurrency) {
+        this.displayCurrency = displayCurrency;
     }
 
     public BigDecimal getTaxCapitalGainsRate() {

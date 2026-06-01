@@ -48,6 +48,7 @@ public class UserPreferencesController {
                                 && request.defaultTradeSortDirection() == null
                                 && request.showTradeHistory() == null
                                 && request.dashboardWidgets() == null
+                                && request.displayCurrency() == null
                                 && request.taxCapitalGainsRate() == null
                                 && request.taxPersonalRate() == null
                         )
@@ -66,6 +67,7 @@ public class UserPreferencesController {
                         request.defaultTradeSortDirection(),
                         request.showTradeHistory(),
                         request.dashboardWidgets(),
+                        request.displayCurrency(),
                         request.taxCapitalGainsRate(),
                         request.taxPersonalRate()
                 )

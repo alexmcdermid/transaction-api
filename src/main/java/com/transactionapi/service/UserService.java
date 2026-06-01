@@ -1,6 +1,7 @@
 package com.transactionapi.service;
 
 import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
@@ -53,6 +54,7 @@ public class UserService {
             TradeSortDirection defaultTradeSortDirection,
             Boolean showTradeHistory,
             List<DashboardWidget> dashboardWidgets,
+            Currency displayCurrency,
             BigDecimal taxCapitalGainsRate,
             BigDecimal taxPersonalRate
     ) {
@@ -74,6 +76,9 @@ public class UserService {
         }
         if (dashboardWidgets != null) {
             user.setDashboardWidgets(DashboardWidget.toStorage(dashboardWidgets));
+        }
+        if (displayCurrency != null) {
+            user.setDisplayCurrency(displayCurrency);
         }
         if (taxCapitalGainsRate != null) {
             user.setTaxCapitalGainsRate(taxCapitalGainsRate.setScale(2, RoundingMode.HALF_UP));
