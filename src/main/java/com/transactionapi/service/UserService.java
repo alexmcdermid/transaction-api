@@ -1,11 +1,16 @@
 package com.transactionapi.service;
 
+import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.model.User;
 import com.transactionapi.repository.UserRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +52,11 @@ public class UserService {
             PnlDisplayMode pnlDisplayMode,
             TradeSortField defaultTradeSortBy,
             TradeSortDirection defaultTradeSortDirection,
-            Boolean showTradeHistory
+            Boolean showTradeHistory,
+            List<DashboardWidget> dashboardWidgets,
+            Currency displayCurrency,
+            BigDecimal taxCapitalGainsRate,
+            BigDecimal taxPersonalRate
     ) {
         User user = getOrCreateUser(authId, email);
         if (themeMode != null) {
@@ -64,6 +73,18 @@ public class UserService {
         }
         if (showTradeHistory != null) {
             user.setShowTradeHistory(showTradeHistory);
+        }
+        if (dashboardWidgets != null) {
+            user.setDashboardWidgets(DashboardWidget.toStorage(dashboardWidgets));
+        }
+        if (displayCurrency != null) {
+            user.setDisplayCurrency(displayCurrency);
+        }
+        if (taxCapitalGainsRate != null) {
+            user.setTaxCapitalGainsRate(taxCapitalGainsRate.setScale(2, RoundingMode.HALF_UP));
+        }
+        if (taxPersonalRate != null) {
+            user.setTaxPersonalRate(taxPersonalRate.setScale(2, RoundingMode.HALF_UP));
         }
         return userRepository.save(user);
     }

@@ -1,5 +1,7 @@
 package com.transactionapi.model;
 
+import com.transactionapi.constants.DashboardWidget;
+import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.PnlDisplayMode;
 import com.transactionapi.constants.ThemeMode;
 import com.transactionapi.constants.TradeSortDirection;
@@ -13,6 +15,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -54,6 +57,19 @@ public class User {
 
     @Column(name = "show_trade_history", nullable = false)
     private boolean showTradeHistory = false;
+
+    @Column(name = "dashboard_widgets", nullable = false, length = 256)
+    private String dashboardWidgets = DashboardWidget.defaultStorageValue();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "display_currency", nullable = false, length = 3)
+    private Currency displayCurrency = Currency.USD;
+
+    @Column(name = "tax_capital_gains_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal taxCapitalGainsRate = new BigDecimal("50.00");
+
+    @Column(name = "tax_personal_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal taxPersonalRate = new BigDecimal("50.00");
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -139,6 +155,38 @@ public class User {
 
     public void setShowTradeHistory(boolean showTradeHistory) {
         this.showTradeHistory = showTradeHistory;
+    }
+
+    public String getDashboardWidgets() {
+        return dashboardWidgets;
+    }
+
+    public void setDashboardWidgets(String dashboardWidgets) {
+        this.dashboardWidgets = dashboardWidgets;
+    }
+
+    public Currency getDisplayCurrency() {
+        return displayCurrency;
+    }
+
+    public void setDisplayCurrency(Currency displayCurrency) {
+        this.displayCurrency = displayCurrency;
+    }
+
+    public BigDecimal getTaxCapitalGainsRate() {
+        return taxCapitalGainsRate;
+    }
+
+    public void setTaxCapitalGainsRate(BigDecimal taxCapitalGainsRate) {
+        this.taxCapitalGainsRate = taxCapitalGainsRate;
+    }
+
+    public BigDecimal getTaxPersonalRate() {
+        return taxPersonalRate;
+    }
+
+    public void setTaxPersonalRate(BigDecimal taxPersonalRate) {
+        this.taxPersonalRate = taxPersonalRate;
     }
 
     public Instant getCreatedAt() {
