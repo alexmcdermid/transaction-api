@@ -248,6 +248,7 @@ public class TradeService {
         
         // Use database aggregation instead of loading all trades
         int tradeCount = tradeRepository.countByUserId(userId);
+        int tradedDays = tradeRepository.countTradedDaysByUserId(userId);
         BigDecimal totalPnl = tradeRepository.sumPnlByUserId(userId, cadToUsdRate);
         if (totalPnl == null) {
             totalPnl = BigDecimal.ZERO;
@@ -291,6 +292,7 @@ public class TradeService {
         return new AggregateStatsResponse(
                 totalPnl,
                 tradeCount,
+                tradedDays,
                 pnlPercent,
                 bestDay,
                 bestMonth,
@@ -315,6 +317,7 @@ public class TradeService {
 
         BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
         int tradeCount = tradeRepository.countByUserIdAndDateRange(userId, startDate, endDate);
+        int tradedDays = tradeRepository.countTradedDaysByUserIdAndDateRange(userId, startDate, endDate);
 
         BigDecimal totalPnl = tradeRepository.sumPnlByUserIdAndDateRange(userId, cadToUsdRate, startDate, endDate);
         if (totalPnl == null) {
@@ -369,6 +372,7 @@ public class TradeService {
         return new AggregateStatsResponse(
                 totalPnl,
                 tradeCount,
+                tradedDays,
                 pnlPercent,
                 bestDay,
                 bestMonth,
