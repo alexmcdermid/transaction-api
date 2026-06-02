@@ -762,6 +762,7 @@ class TradeServiceTest {
 
         assertThat(stats.totalPnl()).isEqualByComparingTo("0.00");
         assertThat(stats.tradeCount()).isEqualTo(0);
+        assertThat(stats.tradedDays()).isEqualTo(0);
         assertThat(stats.bestDay()).isNull();
         assertThat(stats.bestMonth()).isNull();
         assertThat(stats.pnlPercent()).isNull();
@@ -813,6 +814,7 @@ class TradeServiceTest {
 
         assertThat(stats.totalPnl()).isEqualByComparingTo("125.00");
         assertThat(stats.tradeCount()).isEqualTo(2);
+        assertThat(stats.tradedDays()).isEqualTo(2);
         assertThat(stats.pnlPercent()).isEqualByComparingTo("10.00");
     }
 
@@ -1142,6 +1144,7 @@ class TradeServiceTest {
         assertThat(scoped.year()).isEqualTo(2024);
         assertThat(scoped.totalPnl()).isEqualByComparingTo("100.00");
         assertThat(scoped.tradeCount()).isEqualTo(1);
+        assertThat(scoped.tradedDays()).isEqualTo(1);
         assertThat(scoped.bestMonth()).isNotNull();
         assertThat(scoped.bestMonth().period()).isEqualTo("2024-01");
         assertThat(scoped.month()).isEqualTo("2024-01");
@@ -1214,6 +1217,7 @@ class TradeServiceTest {
         assertThat(scoped.year()).isEqualTo(2024);
         assertThat(scoped.totalPnl()).isEqualByComparingTo("120.00");
         assertThat(scoped.tradeCount()).isEqualTo(2);
+        assertThat(scoped.tradedDays()).isEqualTo(2);
         assertThat(scoped.bestMonth()).isNotNull();
         assertThat(scoped.bestMonth().period()).isEqualTo("2024-03");
         assertThat(scoped.month()).isEqualTo("2024-03");

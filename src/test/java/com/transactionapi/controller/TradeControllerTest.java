@@ -232,6 +232,7 @@ class TradeControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeCount").value(2))
+                .andExpect(jsonPath("$.tradedDays").value(2))
                 .andExpect(jsonPath("$.totalPnl").exists())
                 .andExpect(jsonPath("$.bestDay").exists())
                 .andExpect(jsonPath("$.bestDay.period").exists())
@@ -253,6 +254,7 @@ class TradeControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeCount").value(0))
+                .andExpect(jsonPath("$.tradedDays").value(0))
                 .andExpect(jsonPath("$.totalPnl").value(0))
                 .andExpect(jsonPath("$.bestDay").isEmpty())
                 .andExpect(jsonPath("$.bestMonth").isEmpty());

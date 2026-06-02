@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public record AggregateStatsResponse(
         BigDecimal totalPnl,
         int tradeCount,
+        int tradedDays,
         BigDecimal pnlPercent,
         PnlBucketResponse bestDay,
         PnlBucketResponse bestMonth,

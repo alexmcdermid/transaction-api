@@ -46,6 +46,16 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
             @Param("endDate") LocalDate endDate
     );
 
+    @Query("select count(distinct t.closedAt) from Trade t where t.userId = :userId")
+    int countTradedDaysByUserId(@Param("userId") String userId);
+
+    @Query("select count(distinct t.closedAt) from Trade t where t.userId = :userId and t.closedAt >= :startDate and t.closedAt < :endDate")
+    int countTradedDaysByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     @Query(value = """
         select max(closed_at)
         from trades
