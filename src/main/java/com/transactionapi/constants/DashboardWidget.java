@@ -11,7 +11,11 @@ public enum DashboardWidget {
     BEST_MONTH,
     BEST_DAY,
     DAILY_AVG_YTD,
-    TAX_OWED;
+    TAX_OWED,
+    ACCOUNT_STATS,
+    TRADE_COUNTS,
+    POSITION_UPDATE_SIGNALS,
+    INFERRED_ACCOUNT_TRADE_COUNTS;
 
     public static List<DashboardWidget> defaults() {
         return List.of(TOTAL_REALIZED, BEST_MONTH, BEST_DAY);

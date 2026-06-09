@@ -6,13 +6,18 @@ import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.constants.TradeHistoryAction;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
+import com.transactionapi.dto.AccountStatsResponse;
 import com.transactionapi.dto.AggregateStatsResponse;
+import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.PositionUpdateSignalResponse;
+import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
+import com.transactionapi.model.Account;
 import com.transactionapi.model.Trade;
 import com.transactionapi.model.TradeHistory;
 import com.transactionapi.repository.AccountRepository;
@@ -23,6 +28,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -382,6 +390,341 @@ public class TradeService {
                 scopedMonth != null ? scopedMonth.toString() : null,
                 day != null ? day.toString() : null
         );
+    }
+
+    public List<AccountStatsResponse> getAccountStats(String userId, Integer year) {
+        int scopedYear = year != null ? year : resolveScopedYear(userId, null, null, null);
+        LocalDate startDate = LocalDate.of(scopedYear, 1, 1);
+        LocalDate endDate = startDate.plusYears(1).minusDays(1);
+        BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
+        Map<UUID, String> accountNames = accountRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .collect(Collectors.toMap(Account::getId, Account::getName));
+        List<Trade> trades = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(
+                userId,
+                startDate,
+                endDate
+        );
+
+        Map<UUID, List<Trade>> tradesByAccount = new HashMap<>();
+        trades.forEach(trade -> tradesByAccount.computeIfAbsent(trade.getAccountId(), ignored -> new ArrayList<>()).add(trade));
+        return tradesByAccount.entrySet()
+                .stream()
+                .map(entry -> buildAccountStats(entry.getKey(), accountNames, entry.getValue(), cadToUsdRate, scopedYear))
+                .sorted(Comparator.comparing(AccountStatsResponse::totalPnl).reversed())
+                .toList();
+    }
+
+    private AccountStatsResponse buildAccountStats(
+            UUID accountId,
+            Map<UUID, String> accountNames,
+            List<Trade> trades,
+            BigDecimal cadToUsdRate,
+            int year
+    ) {
+        BigDecimal totalPnl = sumPnl(trades, cadToUsdRate);
+        BigDecimal totalNotional = sumNotional(trades, cadToUsdRate);
+        BigDecimal pnlPercent = computePnlPercent(totalPnl, totalNotional);
+        int activeMonths = (int) trades.stream()
+                .map(trade -> YearMonth.from(trade.getClosedAt()))
+                .distinct()
+                .count();
+        int tradedDays = (int) trades.stream()
+                .map(Trade::getClosedAt)
+                .distinct()
+                .count();
+        int tradeCount = trades.size();
+        return new AccountStatsResponse(
+                accountId,
+                accountId != null ? accountNames.getOrDefault(accountId, "Deleted account") : "Unassigned",
+                totalPnl,
+                average(totalPnl, activeMonths),
+                average(totalPnl, tradedDays),
+                average(totalPnl, tradeCount),
+                totalNotional,
+                pnlPercent,
+                tradeCount,
+                tradedDays,
+                activeMonths,
+                year
+        );
+    }
+
+    public TradeCountStatsResponse getTradeCountStats(String userId, Integer year, YearMonth month, LocalDate day) {
+        int scopedYear = resolveScopedYear(userId, year, month, day);
+        YearMonth scopedMonth = month != null
+                ? month
+                : day != null
+                        ? YearMonth.from(day)
+                        : YearMonth.of(scopedYear, LocalDate.now().getMonth());
+        LocalDate scopedDay = day != null ? day : LocalDate.now();
+        LocalDate yearStart = LocalDate.of(scopedYear, 1, 1);
+        LocalDate yearEnd = yearStart.plusYears(1);
+        LocalDate monthStart = scopedMonth.atDay(1);
+        LocalDate monthEnd = monthStart.plusMonths(1);
+
+        int yearTradeCount = tradeRepository.countByUserIdAndDateRange(userId, yearStart, yearEnd);
+        int monthTradeCount = tradeRepository.countByUserIdAndDateRange(userId, monthStart, monthEnd);
+        int dayTradeCount = tradeRepository.countByUserIdAndDateRange(userId, scopedDay, scopedDay.plusDays(1));
+        int yearTradedDays = tradeRepository.countTradedDaysByUserIdAndDateRange(userId, yearStart, yearEnd);
+        int tradingDays = countWeekdays(yearStart, LocalDate.now().getYear() == scopedYear ? LocalDate.now() : yearEnd.minusDays(1));
+
+        return new TradeCountStatsResponse(
+                yearTradeCount,
+                monthTradeCount,
+                dayTradeCount,
+                yearTradedDays,
+                average(BigDecimal.valueOf(yearTradeCount), yearTradedDays),
+                average(BigDecimal.valueOf(yearTradeCount), tradingDays),
+                scopedYear,
+                scopedMonth.toString(),
+                scopedDay
+        );
+    }
+
+    public List<PositionUpdateSignalResponse> getPositionUpdateSignals(String userId, int limit) {
+        Map<UUID, String> accountNames = accountRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .collect(Collectors.toMap(Account::getId, Account::getName));
+        Map<UUID, List<TradeHistory>> byTrade = tradeHistoryRepository.findByUserIdOrderByActionAtDesc(userId).stream()
+                .collect(Collectors.groupingBy(TradeHistory::getTradeId));
+
+        List<PositionUpdateSignalResponse> signals = new ArrayList<>();
+        for (List<TradeHistory> rawHistory : byTrade.values()) {
+            List<TradeHistory> history = rawHistory.stream()
+                    .sorted(Comparator.comparing(TradeHistory::getActionAt))
+                    .toList();
+            PositionUpdateSignalResponse signal = toPositionUpdateSignal(history, accountNames);
+            if (signal != null) {
+                signals.add(signal);
+            }
+        }
+        return signals.stream()
+                .sorted(Comparator.comparing(PositionUpdateSignalResponse::latestEditAt).reversed())
+                .limit(Math.max(1, Math.min(limit, 20)))
+                .toList();
+    }
+
+    public List<InferredAccountTradeCountsResponse> getInferredAccountTradeCounts(String userId, Integer year) {
+        int scopedYear = year != null ? year : resolveScopedYear(userId, null, null, null);
+        Map<UUID, String> accountNames = accountRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .collect(Collectors.toMap(Account::getId, Account::getName));
+        Map<UUID, List<TradeHistory>> byTrade = tradeHistoryRepository.findByUserIdOrderByActionAtDesc(userId).stream()
+                .collect(Collectors.groupingBy(TradeHistory::getTradeId));
+
+        Map<UUID, InferredAccountTradeCountsAccumulator> byAccount = new HashMap<>();
+        for (List<TradeHistory> rawHistory : byTrade.values()) {
+            List<TradeHistory> history = rawHistory.stream()
+                    .sorted(Comparator.comparing(TradeHistory::getActionAt))
+                    .toList();
+            applyInferredTradeCounts(history, scopedYear, accountNames, byAccount);
+        }
+
+        return byAccount.values().stream()
+                .map(accumulator -> accumulator.toResponse(scopedYear))
+                .sorted(Comparator.comparing(InferredAccountTradeCountsResponse::inferredTotalCount).reversed())
+                .toList();
+    }
+
+    private void applyInferredTradeCounts(
+            List<TradeHistory> history,
+            int year,
+            Map<UUID, String> accountNames,
+            Map<UUID, InferredAccountTradeCountsAccumulator> byAccount
+    ) {
+        TradeHistory created = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.CREATE)
+                .findFirst()
+                .orElse(null);
+        if (created == null || history.stream().anyMatch(entry -> entry.getAction() == TradeHistoryAction.DELETE)) {
+            return;
+        }
+
+        TradeHistory latest = history.get(history.size() - 1);
+        if (latest.getClosedAt() == null || latest.getClosedAt().getYear() != year) {
+            return;
+        }
+
+        UUID accountId = latest.getAccountId();
+        InferredAccountTradeCountsAccumulator accumulator = byAccount.computeIfAbsent(
+                accountId,
+                id -> new InferredAccountTradeCountsAccumulator(
+                        id,
+                        id != null ? accountNames.getOrDefault(id, "Deleted account") : "Unassigned"
+                )
+        );
+        accumulator.recordClosedTrade(latest.getDirection());
+
+        TradeHistory previous = created;
+        for (TradeHistory current : history.stream().filter(entry -> entry.getAction() == TradeHistoryAction.EDIT).toList()) {
+            if (!sameTradeIdentity(previous, current)) {
+                previous = current;
+                continue;
+            }
+            int previousQuantity = previous.getQuantity() != null ? previous.getQuantity() : 0;
+            int currentQuantity = current.getQuantity() != null ? current.getQuantity() : 0;
+            int quantityDelta = currentQuantity - previousQuantity;
+            if (quantityDelta > 0) {
+                accumulator.recordAdd(current.getDirection(), quantityDelta, inferAddedEntryPrice(previous, current, quantityDelta));
+            }
+            previous = current;
+        }
+    }
+
+    private BigDecimal inferAddedEntryPrice(TradeHistory previous, TradeHistory current, int quantityDelta) {
+        if (quantityDelta <= 0 || previous.getEntryPrice() == null || current.getEntryPrice() == null) {
+            return null;
+        }
+        int previousQuantity = previous.getQuantity() != null ? previous.getQuantity() : 0;
+        int currentQuantity = current.getQuantity() != null ? current.getQuantity() : 0;
+        if (previousQuantity <= 0 || currentQuantity <= previousQuantity) {
+            return null;
+        }
+        BigDecimal currentNotional = current.getEntryPrice().multiply(BigDecimal.valueOf(currentQuantity));
+        BigDecimal previousNotional = previous.getEntryPrice().multiply(BigDecimal.valueOf(previousQuantity));
+        return currentNotional.subtract(previousNotional)
+                .divide(BigDecimal.valueOf(quantityDelta), 4, RoundingMode.HALF_UP);
+    }
+
+    private PositionUpdateSignalResponse toPositionUpdateSignal(
+            List<TradeHistory> history,
+            Map<UUID, String> accountNames
+    ) {
+        TradeHistory created = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.CREATE)
+                .findFirst()
+                .orElse(null);
+        if (created == null || history.stream().anyMatch(entry -> entry.getAction() == TradeHistoryAction.DELETE)) {
+            return null;
+        }
+        List<TradeHistory> edits = history.stream()
+                .filter(entry -> entry.getAction() == TradeHistoryAction.EDIT)
+                .filter(entry -> sameTradeIdentity(created, entry))
+                .toList();
+        if (edits.isEmpty()) {
+            return null;
+        }
+        TradeHistory latest = edits.get(edits.size() - 1);
+        int initialQuantity = created.getQuantity() != null ? created.getQuantity() : 0;
+        int latestQuantity = latest.getQuantity() != null ? latest.getQuantity() : 0;
+        if (latestQuantity <= initialQuantity || equalBigDecimal(created.getEntryPrice(), latest.getEntryPrice())) {
+            return null;
+        }
+        UUID accountId = latest.getAccountId();
+        return new PositionUpdateSignalResponse(
+                latest.getTradeId(),
+                latest.getSymbol(),
+                accountId,
+                accountId != null ? accountNames.getOrDefault(accountId, "Deleted account") : "Unassigned",
+                latest.getClosedAt(),
+                edits.size(),
+                initialQuantity,
+                latestQuantity,
+                latestQuantity - initialQuantity,
+                created.getEntryPrice(),
+                latest.getEntryPrice(),
+                created.getActionAt(),
+                latest.getActionAt()
+        );
+    }
+
+    private boolean sameTradeIdentity(TradeHistory initial, TradeHistory current) {
+        return Objects.equals(initial.getSymbol(), current.getSymbol())
+                && initial.getAssetType() == current.getAssetType()
+                && initial.getCurrency() == current.getCurrency()
+                && initial.getDirection() == current.getDirection()
+                && Objects.equals(initial.getAccountId(), current.getAccountId())
+                && Objects.equals(initial.getOpenedAt(), current.getOpenedAt())
+                && Objects.equals(initial.getClosedAt(), current.getClosedAt())
+                && Objects.equals(initial.getOptionType(), current.getOptionType())
+                && equalBigDecimal(initial.getStrikePrice(), current.getStrikePrice())
+                && Objects.equals(initial.getExpiryDate(), current.getExpiryDate());
+    }
+
+    private boolean equalBigDecimal(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
+    }
+
+    private BigDecimal average(BigDecimal total, int divisor) {
+        if (total == null || divisor <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return total.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
+    }
+
+    private int countWeekdays(LocalDate start, LocalDate inclusiveEnd) {
+        if (inclusiveEnd.isBefore(start)) {
+            return 0;
+        }
+        int days = 0;
+        for (LocalDate date = start; !date.isAfter(inclusiveEnd); date = date.plusDays(1)) {
+            int dayOfWeek = date.getDayOfWeek().getValue();
+            if (dayOfWeek <= 5) {
+                days++;
+            }
+        }
+        return days;
+    }
+
+    private static class InferredAccountTradeCountsAccumulator {
+        private final UUID accountId;
+        private final String accountName;
+        private int recordedTradeCount;
+        private int inferredBuyCount;
+        private int inferredSellCount;
+        private int inferredAddCount;
+        private int inferredAddedQuantity;
+        private int inferredPricedAddedQuantity;
+        private BigDecimal inferredAddedNotional = BigDecimal.ZERO;
+
+        InferredAccountTradeCountsAccumulator(UUID accountId, String accountName) {
+            this.accountId = accountId;
+            this.accountName = accountName;
+        }
+
+        void recordClosedTrade(TradeDirection direction) {
+            recordedTradeCount++;
+            if (direction == TradeDirection.SHORT) {
+                inferredSellCount++;
+                inferredBuyCount++;
+                return;
+            }
+            inferredBuyCount++;
+            inferredSellCount++;
+        }
+
+        void recordAdd(TradeDirection direction, int quantityDelta, BigDecimal inferredPrice) {
+            inferredAddCount++;
+            inferredAddedQuantity += quantityDelta;
+            if (direction == TradeDirection.SHORT) {
+                inferredSellCount++;
+            } else {
+                inferredBuyCount++;
+            }
+            if (inferredPrice != null) {
+                inferredPricedAddedQuantity += quantityDelta;
+                inferredAddedNotional = inferredAddedNotional.add(inferredPrice.multiply(BigDecimal.valueOf(quantityDelta)));
+            }
+        }
+
+        InferredAccountTradeCountsResponse toResponse(int year) {
+            BigDecimal averageInferredAddPrice = inferredPricedAddedQuantity > 0
+                    ? inferredAddedNotional.divide(BigDecimal.valueOf(inferredPricedAddedQuantity), 4, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+            return new InferredAccountTradeCountsResponse(
+                    accountId,
+                    accountName,
+                    recordedTradeCount,
+                    inferredBuyCount,
+                    inferredSellCount,
+                    inferredBuyCount + inferredSellCount,
+                    inferredAddCount,
+                    inferredAddedQuantity,
+                    averageInferredAddPrice,
+                    year
+            );
+        }
     }
 
     private int resolveScopedYear(String userId, Integer year, YearMonth month, LocalDate day) {

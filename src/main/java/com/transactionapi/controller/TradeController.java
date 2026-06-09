@@ -3,9 +3,13 @@ package com.transactionapi.controller;
 import com.transactionapi.constants.ApiPaths;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
+import com.transactionapi.dto.AccountStatsResponse;
 import com.transactionapi.dto.AggregateStatsResponse;
+import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.PositionUpdateSignalResponse;
+import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
@@ -142,6 +146,48 @@ public class TradeController {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.getScopedAggregateStats(userId, year, parseMonth(month), parseDate(day));
+    }
+
+    @GetMapping("/stats/accounts")
+    public List<AccountStatsResponse> accountStats(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getAccountStats(userId, year);
+    }
+
+    @GetMapping("/stats/counts")
+    public TradeCountStatsResponse countStats(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) String day
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getTradeCountStats(userId, year, parseMonth(month), parseDate(day));
+    }
+
+    @GetMapping("/history/position-update-signals")
+    public List<PositionUpdateSignalResponse> positionUpdateSignals(
+            Authentication authentication,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getPositionUpdateSignals(userId, limit);
+    }
+
+    @GetMapping("/stats/inferred-account-counts")
+    public List<InferredAccountTradeCountsResponse> inferredAccountTradeCounts(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getInferredAccountTradeCounts(userId, year);
     }
 
     private static java.time.YearMonth parseMonth(String value) {

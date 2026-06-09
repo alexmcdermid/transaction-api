@@ -10,9 +10,13 @@ import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.constants.TradeHistoryAction;
 import com.transactionapi.constants.TradeSortDirection;
 import com.transactionapi.constants.TradeSortField;
+import com.transactionapi.dto.AccountStatsResponse;
 import com.transactionapi.dto.AggregateStatsResponse;
+import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PagedResponse;
+import com.transactionapi.dto.PositionUpdateSignalResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.dto.TradeResponse;
 import com.transactionapi.model.Account;
@@ -1348,5 +1352,313 @@ class TradeServiceTest {
         assertThat(scoped.bestDay()).isNotNull();
         assertThat(scoped.bestDay().period()).isEqualTo("2024-02-20");
         assertThat(scoped.bestDay().pnl()).isEqualByComparingTo("35.00");
+    }
+
+    @Test
+    void accountStatsGroupsTradesByAccountForRequestedYear() {
+        Account account = createAccount("Wealthsimple");
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("110.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("50.00"),
+                        new BigDecimal("55.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 12),
+                        LocalDate.of(2024, 2, 12),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "OLD",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("1.00"),
+                        new BigDecimal("2.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2023, 12, 1),
+                        LocalDate.of(2023, 12, 1),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "NEXT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("1.00"),
+                        new BigDecimal("2.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2025, 1, 1),
+                        LocalDate.of(2025, 1, 1),
+                        null
+                ),
+                USER_ID
+        );
+
+        List<AccountStatsResponse> stats = tradeService.getAccountStats(USER_ID, 2024);
+
+        assertThat(stats).hasSize(1);
+        AccountStatsResponse accountStats = stats.get(0);
+        assertThat(accountStats.accountId()).isEqualTo(account.getId());
+        assertThat(accountStats.accountName()).isEqualTo("Wealthsimple");
+        assertThat(accountStats.totalPnl()).isEqualByComparingTo("150.00");
+        assertThat(accountStats.monthlyAveragePnl()).isEqualByComparingTo("75.00");
+        assertThat(accountStats.tradedDayAveragePnl()).isEqualByComparingTo("75.00");
+        assertThat(accountStats.averageTradePnl()).isEqualByComparingTo("75.00");
+        assertThat(accountStats.tradeCount()).isEqualTo(2);
+        assertThat(accountStats.tradedDays()).isEqualTo(2);
+        assertThat(accountStats.activeMonths()).isEqualTo(2);
+        assertThat(accountStats.year()).isEqualTo(2024);
+    }
+
+    @Test
+    void tradeCountStatsReturnsScopedCounts() {
+        tradeService.createTrade(
+                new TradeRequest(
+                        "JAN",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("101.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-A",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("101.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 20),
+                        LocalDate.of(2024, 2, 20),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "FEB-B",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        5,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("101.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 2, 20),
+                        LocalDate.of(2024, 2, 20),
+                        null
+                ),
+                USER_ID
+        );
+
+        TradeCountStatsResponse stats = tradeService.getTradeCountStats(
+                USER_ID,
+                2024,
+                YearMonth.of(2024, 2),
+                LocalDate.of(2024, 2, 20)
+        );
+
+        assertThat(stats.yearTradeCount()).isEqualTo(3);
+        assertThat(stats.monthTradeCount()).isEqualTo(2);
+        assertThat(stats.dayTradeCount()).isEqualTo(2);
+        assertThat(stats.yearTradedDays()).isEqualTo(2);
+        assertThat(stats.averageTradesPerTradedDay()).isEqualByComparingTo("1.50");
+        assertThat(stats.year()).isEqualTo(2024);
+        assertThat(stats.month()).isEqualTo("2024-02");
+        assertThat(stats.day()).isEqualTo(LocalDate.of(2024, 2, 20));
+    }
+
+    @Test
+    void positionUpdateSignalsFindQuantityIncreaseEditsWithChangedAverageEntry() {
+        Account account = createAccount("Questrade");
+        TradeResponse created = tradeService.createTrade(
+                new TradeRequest(
+                        "NVDA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1000,
+                        new BigDecimal("5.00"),
+                        new BigDecimal("6.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 15),
+                        LocalDate.of(2024, 3, 15),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.updateTrade(
+                created.id(),
+                new TradeRequest(
+                        "NVDA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        2000,
+                        new BigDecimal("4.50"),
+                        new BigDecimal("6.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 15),
+                        LocalDate.of(2024, 3, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        List<PositionUpdateSignalResponse> signals = tradeService.getPositionUpdateSignals(USER_ID, 5);
+
+        assertThat(signals).hasSize(1);
+        PositionUpdateSignalResponse signal = signals.get(0);
+        assertThat(signal.tradeId()).isEqualTo(created.id());
+        assertThat(signal.symbol()).isEqualTo("NVDA");
+        assertThat(signal.accountName()).isEqualTo("Questrade");
+        assertThat(signal.initialQuantity()).isEqualTo(1000);
+        assertThat(signal.latestQuantity()).isEqualTo(2000);
+        assertThat(signal.quantityDelta()).isEqualTo(1000);
+        assertThat(signal.initialEntryPrice()).isEqualByComparingTo("5.00");
+        assertThat(signal.latestEntryPrice()).isEqualByComparingTo("4.50");
+    }
+
+    @Test
+    void inferredAccountTradeCountsExpandQuantityIncreaseEditsIntoBuySellCounts() {
+        Account account = createAccount("Interactive Brokers");
+        TradeResponse created = tradeService.createTrade(
+                new TradeRequest(
+                        "NVDA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1000,
+                        new BigDecimal("5.00"),
+                        new BigDecimal("6.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 15),
+                        LocalDate.of(2024, 3, 15),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.updateTrade(
+                created.id(),
+                new TradeRequest(
+                        "NVDA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        2000,
+                        new BigDecimal("4.50"),
+                        new BigDecimal("6.00"),
+                        BigDecimal.ZERO,
+                        account.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 3, 15),
+                        LocalDate.of(2024, 3, 15),
+                        null
+                ),
+                USER_ID
+        );
+
+        List<InferredAccountTradeCountsResponse> counts = tradeService.getInferredAccountTradeCounts(USER_ID, 2024);
+
+        assertThat(counts).hasSize(1);
+        InferredAccountTradeCountsResponse accountCounts = counts.get(0);
+        assertThat(accountCounts.accountId()).isEqualTo(account.getId());
+        assertThat(accountCounts.accountName()).isEqualTo("Interactive Brokers");
+        assertThat(accountCounts.recordedTradeCount()).isEqualTo(1);
+        assertThat(accountCounts.inferredBuyCount()).isEqualTo(2);
+        assertThat(accountCounts.inferredSellCount()).isEqualTo(1);
+        assertThat(accountCounts.inferredTotalCount()).isEqualTo(3);
+        assertThat(accountCounts.inferredAddCount()).isEqualTo(1);
+        assertThat(accountCounts.inferredAddedQuantity()).isEqualTo(1000);
+        assertThat(accountCounts.averageInferredAddPrice()).isEqualByComparingTo("4.0000");
+        assertThat(accountCounts.year()).isEqualTo(2024);
+    }
+
+    private Account createAccount(String name) {
+        Account account = new Account();
+        account.setUserId(USER_ID);
+        account.setName(name);
+        account.setDefaultStockFees(BigDecimal.ZERO);
+        account.setDefaultOptionFees(BigDecimal.ZERO);
+        account.setDefaultMarginRateUsd(BigDecimal.ZERO);
+        account.setDefaultMarginRateCad(BigDecimal.ZERO);
+        return accountRepository.save(account);
     }
 }
