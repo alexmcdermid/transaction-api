@@ -1638,7 +1638,12 @@ class TradeServiceTest {
                 USER_ID
         );
 
-        List<InferredAccountTradeCountsResponse> counts = tradeService.getInferredAccountTradeCounts(USER_ID, 2024);
+        List<InferredAccountTradeCountsResponse> counts = tradeService.getInferredAccountTradeCounts(
+                USER_ID,
+                2024,
+                YearMonth.of(2024, 3),
+                LocalDate.of(2024, 3, 15)
+        );
 
         assertThat(counts).hasSize(1);
         InferredAccountTradeCountsResponse accountCounts = counts.get(0);
@@ -1648,10 +1653,14 @@ class TradeServiceTest {
         assertThat(accountCounts.inferredBuyCount()).isEqualTo(2);
         assertThat(accountCounts.inferredSellCount()).isEqualTo(1);
         assertThat(accountCounts.inferredTotalCount()).isEqualTo(3);
+        assertThat(accountCounts.monthInferredTotalCount()).isEqualTo(3);
+        assertThat(accountCounts.dayInferredTotalCount()).isEqualTo(3);
         assertThat(accountCounts.inferredAddCount()).isEqualTo(1);
         assertThat(accountCounts.inferredAddedQuantity()).isEqualTo(1000);
         assertThat(accountCounts.averageInferredAddPrice()).isEqualByComparingTo("4.0000");
         assertThat(accountCounts.year()).isEqualTo(2024);
+        assertThat(accountCounts.month()).isEqualTo("2024-03");
+        assertThat(accountCounts.day()).isEqualTo(LocalDate.of(2024, 3, 15));
     }
 
     private Account createAccount(String name) {

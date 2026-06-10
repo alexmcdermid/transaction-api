@@ -174,11 +174,13 @@ public class TradeController {
     @GetMapping("/stats/inferred-account-counts")
     public List<InferredAccountTradeCountsResponse> inferredAccountTradeCounts(
             Authentication authentication,
-            @RequestParam(required = false) Integer year
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) String day
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.getInferredAccountTradeCounts(userId, year);
+        return tradeService.getInferredAccountTradeCounts(userId, year, parseMonth(month), parseDate(day));
     }
 
     private static java.time.YearMonth parseMonth(String value) {

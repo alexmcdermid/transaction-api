@@ -520,8 +520,17 @@ public class TradeService {
                 .orElse("Deleted account");
     }
 
-    public List<InferredAccountTradeCountsResponse> getInferredAccountTradeCounts(String userId, Integer year) {
-        int scopedYear = year != null ? year : resolveScopedYear(userId, null, null, null);
+    public List<InferredAccountTradeCountsResponse> getInferredAccountTradeCounts(
+            String userId,
+            Integer year,
+            YearMonth month,
+            LocalDate day
+    ) {
+        int scopedYear = year != null ? year : resolveScopedYear(userId, null, month, day);
+        YearMonth scopedMonth = month != null
+                ? month
+                : YearMonth.of(scopedYear, LocalDate.now().getMonth());
+        LocalDate scopedDay = day != null ? day : LocalDate.now();
         Map<UUID, String> accountNames = accountRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .collect(Collectors.toMap(Account::getId, Account::getName));
         Map<UUID, List<TradeHistory>> byTrade = tradeHistoryRepository.findByUserIdOrderByActionAtDesc(userId).stream()
@@ -532,11 +541,11 @@ public class TradeService {
             List<TradeHistory> history = rawHistory.stream()
                     .sorted(Comparator.comparing(TradeHistory::getActionAt))
                     .toList();
-            applyInferredTradeCounts(history, scopedYear, accountNames, byAccount);
+            applyInferredTradeCounts(history, scopedYear, scopedMonth, scopedDay, accountNames, byAccount);
         }
 
         return byAccount.values().stream()
-                .map(accumulator -> accumulator.toResponse(scopedYear))
+                .map(accumulator -> accumulator.toResponse(scopedYear, scopedMonth, scopedDay))
                 .sorted(Comparator.comparing(InferredAccountTradeCountsResponse::inferredTotalCount).reversed())
                 .toList();
     }
@@ -544,6 +553,8 @@ public class TradeService {
     private void applyInferredTradeCounts(
             List<TradeHistory> history,
             int year,
+            YearMonth month,
+            LocalDate day,
             Map<UUID, String> accountNames,
             Map<UUID, InferredAccountTradeCountsAccumulator> byAccount
     ) {
@@ -568,7 +579,9 @@ public class TradeService {
                         id != null ? accountNames.getOrDefault(id, "Deleted account") : "Unassigned"
                 )
         );
-        accumulator.recordClosedTrade(latest.getDirection());
+        boolean inMonth = YearMonth.from(latest.getClosedAt()).equals(month);
+        boolean onDay = latest.getClosedAt().equals(day);
+        accumulator.recordClosedTrade(latest.getDirection(), inMonth, onDay);
 
         TradeHistory previous = created;
         for (TradeHistory current : history.stream().filter(entry -> entry.getAction() == TradeHistoryAction.EDIT).toList()) {
@@ -580,7 +593,13 @@ public class TradeService {
             int currentQuantity = current.getQuantity() != null ? current.getQuantity() : 0;
             int quantityDelta = currentQuantity - previousQuantity;
             if (quantityDelta > 0) {
-                accumulator.recordAdd(current.getDirection(), quantityDelta, inferAddedEntryPrice(previous, current, quantityDelta));
+                accumulator.recordAdd(
+                        current.getDirection(),
+                        quantityDelta,
+                        inferAddedEntryPrice(previous, current, quantityDelta),
+                        inMonth,
+                        onDay
+                );
             }
             previous = current;
         }
@@ -648,6 +667,8 @@ public class TradeService {
         private int recordedTradeCount;
         private int inferredBuyCount;
         private int inferredSellCount;
+        private int monthInferredTotalCount;
+        private int dayInferredTotalCount;
         private int inferredAddCount;
         private int inferredAddedQuantity;
         private int inferredPricedAddedQuantity;
@@ -658,18 +679,20 @@ public class TradeService {
             this.accountName = accountName;
         }
 
-        void recordClosedTrade(TradeDirection direction) {
+        void recordClosedTrade(TradeDirection direction, boolean inMonth, boolean onDay) {
             recordedTradeCount++;
             if (direction == TradeDirection.SHORT) {
                 inferredSellCount++;
                 inferredBuyCount++;
+                recordScopedInferredCount(2, inMonth, onDay);
                 return;
             }
             inferredBuyCount++;
             inferredSellCount++;
+            recordScopedInferredCount(2, inMonth, onDay);
         }
 
-        void recordAdd(TradeDirection direction, int quantityDelta, BigDecimal inferredPrice) {
+        void recordAdd(TradeDirection direction, int quantityDelta, BigDecimal inferredPrice, boolean inMonth, boolean onDay) {
             inferredAddCount++;
             inferredAddedQuantity += quantityDelta;
             if (direction == TradeDirection.SHORT) {
@@ -677,13 +700,23 @@ public class TradeService {
             } else {
                 inferredBuyCount++;
             }
+            recordScopedInferredCount(1, inMonth, onDay);
             if (inferredPrice != null) {
                 inferredPricedAddedQuantity += quantityDelta;
                 inferredAddedNotional = inferredAddedNotional.add(inferredPrice.multiply(BigDecimal.valueOf(quantityDelta)));
             }
         }
 
-        InferredAccountTradeCountsResponse toResponse(int year) {
+        private void recordScopedInferredCount(int count, boolean inMonth, boolean onDay) {
+            if (inMonth) {
+                monthInferredTotalCount += count;
+            }
+            if (onDay) {
+                dayInferredTotalCount += count;
+            }
+        }
+
+        InferredAccountTradeCountsResponse toResponse(int year, YearMonth month, LocalDate day) {
             BigDecimal averageInferredAddPrice = inferredPricedAddedQuantity > 0
                     ? inferredAddedNotional.divide(BigDecimal.valueOf(inferredPricedAddedQuantity), 4, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
@@ -694,10 +727,14 @@ public class TradeService {
                     inferredBuyCount,
                     inferredSellCount,
                     inferredBuyCount + inferredSellCount,
+                    monthInferredTotalCount,
+                    dayInferredTotalCount,
                     inferredAddCount,
                     inferredAddedQuantity,
                     averageInferredAddPrice,
-                    year
+                    year,
+                    month.toString(),
+                    day
             );
         }
     }
