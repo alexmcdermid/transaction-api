@@ -12,7 +12,6 @@ import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
-import com.transactionapi.dto.PositionUpdateSignalResponse;
 import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -449,7 +448,14 @@ public class TradeService {
         );
     }
 
-    public TradeCountStatsResponse getTradeCountStats(String userId, Integer year, YearMonth month, LocalDate day) {
+    public TradeCountStatsResponse getTradeCountStats(
+            String userId,
+            Integer year,
+            YearMonth month,
+            LocalDate day,
+            UUID accountId,
+            boolean unassigned
+    ) {
         int scopedYear = resolveScopedYear(userId, year, month, day);
         YearMonth scopedMonth = month != null
                 ? month
@@ -459,16 +465,30 @@ public class TradeService {
         LocalDate scopedDay = day != null ? day : LocalDate.now();
         LocalDate yearStart = LocalDate.of(scopedYear, 1, 1);
         LocalDate yearEnd = yearStart.plusYears(1);
-        LocalDate monthStart = scopedMonth.atDay(1);
-        LocalDate monthEnd = monthStart.plusMonths(1);
+        List<Trade> scopedTrades = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(
+                userId,
+                yearStart,
+                yearEnd.minusDays(1)
+        ).stream()
+                .filter(trade -> accountMatches(trade.getAccountId(), accountId, unassigned))
+                .toList();
 
-        int yearTradeCount = tradeRepository.countByUserIdAndDateRange(userId, yearStart, yearEnd);
-        int monthTradeCount = tradeRepository.countByUserIdAndDateRange(userId, monthStart, monthEnd);
-        int dayTradeCount = tradeRepository.countByUserIdAndDateRange(userId, scopedDay, scopedDay.plusDays(1));
-        int yearTradedDays = tradeRepository.countTradedDaysByUserIdAndDateRange(userId, yearStart, yearEnd);
+        int yearTradeCount = scopedTrades.size();
+        int monthTradeCount = (int) scopedTrades.stream()
+                .filter(trade -> YearMonth.from(trade.getClosedAt()).equals(scopedMonth))
+                .count();
+        int dayTradeCount = (int) scopedTrades.stream()
+                .filter(trade -> trade.getClosedAt().equals(scopedDay))
+                .count();
+        int yearTradedDays = (int) scopedTrades.stream()
+                .map(Trade::getClosedAt)
+                .distinct()
+                .count();
         int tradingDays = countWeekdays(yearStart, LocalDate.now().getYear() == scopedYear ? LocalDate.now() : yearEnd.minusDays(1));
 
         return new TradeCountStatsResponse(
+                unassigned ? null : accountId,
+                resolveAccountName(userId, accountId, unassigned),
                 yearTradeCount,
                 monthTradeCount,
                 dayTradeCount,
@@ -481,26 +501,23 @@ public class TradeService {
         );
     }
 
-    public List<PositionUpdateSignalResponse> getPositionUpdateSignals(String userId, int limit) {
-        Map<UUID, String> accountNames = accountRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .collect(Collectors.toMap(Account::getId, Account::getName));
-        Map<UUID, List<TradeHistory>> byTrade = tradeHistoryRepository.findByUserIdOrderByActionAtDesc(userId).stream()
-                .collect(Collectors.groupingBy(TradeHistory::getTradeId));
-
-        List<PositionUpdateSignalResponse> signals = new ArrayList<>();
-        for (List<TradeHistory> rawHistory : byTrade.values()) {
-            List<TradeHistory> history = rawHistory.stream()
-                    .sorted(Comparator.comparing(TradeHistory::getActionAt))
-                    .toList();
-            PositionUpdateSignalResponse signal = toPositionUpdateSignal(history, accountNames);
-            if (signal != null) {
-                signals.add(signal);
-            }
+    private boolean accountMatches(UUID tradeAccountId, UUID accountId, boolean unassigned) {
+        if (unassigned) {
+            return tradeAccountId == null;
         }
-        return signals.stream()
-                .sorted(Comparator.comparing(PositionUpdateSignalResponse::latestEditAt).reversed())
-                .limit(Math.max(1, Math.min(limit, 20)))
-                .toList();
+        return accountId == null || Objects.equals(tradeAccountId, accountId);
+    }
+
+    private String resolveAccountName(String userId, UUID accountId, boolean unassigned) {
+        if (unassigned) {
+            return "Unassigned";
+        }
+        if (accountId == null) {
+            return "All accounts";
+        }
+        return accountRepository.findByIdAndUserId(accountId, userId)
+                .map(Account::getName)
+                .orElse("Deleted account");
     }
 
     public List<InferredAccountTradeCountsResponse> getInferredAccountTradeCounts(String userId, Integer year) {
@@ -582,48 +599,6 @@ public class TradeService {
         BigDecimal previousNotional = previous.getEntryPrice().multiply(BigDecimal.valueOf(previousQuantity));
         return currentNotional.subtract(previousNotional)
                 .divide(BigDecimal.valueOf(quantityDelta), 4, RoundingMode.HALF_UP);
-    }
-
-    private PositionUpdateSignalResponse toPositionUpdateSignal(
-            List<TradeHistory> history,
-            Map<UUID, String> accountNames
-    ) {
-        TradeHistory created = history.stream()
-                .filter(entry -> entry.getAction() == TradeHistoryAction.CREATE)
-                .findFirst()
-                .orElse(null);
-        if (created == null || history.stream().anyMatch(entry -> entry.getAction() == TradeHistoryAction.DELETE)) {
-            return null;
-        }
-        List<TradeHistory> edits = history.stream()
-                .filter(entry -> entry.getAction() == TradeHistoryAction.EDIT)
-                .filter(entry -> sameTradeIdentity(created, entry))
-                .toList();
-        if (edits.isEmpty()) {
-            return null;
-        }
-        TradeHistory latest = edits.get(edits.size() - 1);
-        int initialQuantity = created.getQuantity() != null ? created.getQuantity() : 0;
-        int latestQuantity = latest.getQuantity() != null ? latest.getQuantity() : 0;
-        if (latestQuantity <= initialQuantity || equalBigDecimal(created.getEntryPrice(), latest.getEntryPrice())) {
-            return null;
-        }
-        UUID accountId = latest.getAccountId();
-        return new PositionUpdateSignalResponse(
-                latest.getTradeId(),
-                latest.getSymbol(),
-                accountId,
-                accountId != null ? accountNames.getOrDefault(accountId, "Deleted account") : "Unassigned",
-                latest.getClosedAt(),
-                edits.size(),
-                initialQuantity,
-                latestQuantity,
-                latestQuantity - initialQuantity,
-                created.getEntryPrice(),
-                latest.getEntryPrice(),
-                created.getActionAt(),
-                latest.getActionAt()
-        );
     }
 
     private boolean sameTradeIdentity(TradeHistory initial, TradeHistory current) {

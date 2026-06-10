@@ -14,7 +14,6 @@ public enum DashboardWidget {
     TAX_OWED,
     ACCOUNT_STATS,
     TRADE_COUNTS,
-    POSITION_UPDATE_SIGNALS,
     INFERRED_ACCOUNT_TRADE_COUNTS;
 
     public static List<DashboardWidget> defaults() {
