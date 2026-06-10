@@ -8,7 +8,6 @@ import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
-import com.transactionapi.dto.PositionUpdateSignalResponse;
 import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -163,21 +162,13 @@ public class TradeController {
             Authentication authentication,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String month,
-            @RequestParam(required = false) String day
+            @RequestParam(required = false) String day,
+            @RequestParam(required = false) UUID accountId,
+            @RequestParam(defaultValue = "false") boolean unassigned
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.getTradeCountStats(userId, year, parseMonth(month), parseDate(day));
-    }
-
-    @GetMapping("/history/position-update-signals")
-    public List<PositionUpdateSignalResponse> positionUpdateSignals(
-            Authentication authentication,
-            @RequestParam(defaultValue = "5") int limit
-    ) {
-        String userId = userIdResolver.requireUserId(authentication);
-        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
-        return tradeService.getPositionUpdateSignals(userId, limit);
+        return tradeService.getTradeCountStats(userId, year, parseMonth(month), parseDate(day), accountId, unassigned);
     }
 
     @GetMapping("/stats/inferred-account-counts")
