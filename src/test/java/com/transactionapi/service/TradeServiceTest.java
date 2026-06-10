@@ -1656,6 +1656,8 @@ class TradeServiceTest {
         assertThat(accountCounts.monthInferredTotalCount()).isEqualTo(3);
         assertThat(accountCounts.dayInferredTotalCount()).isEqualTo(3);
         assertThat(accountCounts.inferredAddCount()).isEqualTo(1);
+        assertThat(accountCounts.monthInferredAddCount()).isEqualTo(1);
+        assertThat(accountCounts.dayInferredAddCount()).isEqualTo(1);
         assertThat(accountCounts.inferredAddedQuantity()).isEqualTo(1000);
         assertThat(accountCounts.averageInferredAddPrice()).isEqualByComparingTo("4.0000");
         assertThat(accountCounts.year()).isEqualTo(2024);

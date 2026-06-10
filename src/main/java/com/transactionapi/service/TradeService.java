@@ -670,6 +670,8 @@ public class TradeService {
         private int monthInferredTotalCount;
         private int dayInferredTotalCount;
         private int inferredAddCount;
+        private int monthInferredAddCount;
+        private int dayInferredAddCount;
         private int inferredAddedQuantity;
         private int inferredPricedAddedQuantity;
         private BigDecimal inferredAddedNotional = BigDecimal.ZERO;
@@ -701,6 +703,12 @@ public class TradeService {
                 inferredBuyCount++;
             }
             recordScopedInferredCount(1, inMonth, onDay);
+            if (inMonth) {
+                monthInferredAddCount++;
+            }
+            if (onDay) {
+                dayInferredAddCount++;
+            }
             if (inferredPrice != null) {
                 inferredPricedAddedQuantity += quantityDelta;
                 inferredAddedNotional = inferredAddedNotional.add(inferredPrice.multiply(BigDecimal.valueOf(quantityDelta)));
@@ -730,6 +738,8 @@ public class TradeService {
                     monthInferredTotalCount,
                     dayInferredTotalCount,
                     inferredAddCount,
+                    monthInferredAddCount,
+                    dayInferredAddCount,
                     inferredAddedQuantity,
                     averageInferredAddPrice,
                     year,
