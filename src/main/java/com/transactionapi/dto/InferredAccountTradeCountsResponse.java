@@ -1,6 +1,7 @@
 package com.transactionapi.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record InferredAccountTradeCountsResponse(
@@ -10,9 +11,13 @@ public record InferredAccountTradeCountsResponse(
         int inferredBuyCount,
         int inferredSellCount,
         int inferredTotalCount,
+        int monthInferredTotalCount,
+        int dayInferredTotalCount,
         int inferredAddCount,
         int inferredAddedQuantity,
         BigDecimal averageInferredAddPrice,
-        Integer year
+        Integer year,
+        String month,
+        LocalDate day
 ) {
 }
