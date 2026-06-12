@@ -8,11 +8,12 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface TradeRepository extends JpaRepository<Trade, UUID> {
+public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecificationExecutor<Trade> {
 
     @Query("select t from Trade t where t.userId = :userId order by t.closedAt desc, t.createdAt desc")
     List<Trade> findAllForUser(@Param("userId") String userId);

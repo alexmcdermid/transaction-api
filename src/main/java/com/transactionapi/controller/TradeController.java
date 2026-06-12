@@ -74,7 +74,10 @@ public class TradeController {
             @RequestParam(required = false) String month,
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false) String sortDirection
+            @RequestParam(required = false) String sortDirection,
+            @RequestParam(name = "accountId", required = false) List<UUID> accountIds,
+            @RequestParam(defaultValue = "false") boolean unassigned,
+            @RequestParam(required = false) String symbol
     ) {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
@@ -85,7 +88,10 @@ public class TradeController {
                 parseMonth(month),
                 parseDate(date),
                 parseSortBy(sortBy),
-                parseSortDirection(sortDirection)
+                parseSortDirection(sortDirection),
+                accountIds,
+                unassigned,
+                symbol
         );
     }
 

@@ -22,6 +22,7 @@ import com.transactionapi.model.TradeHistory;
 import com.transactionapi.repository.AccountRepository;
 import com.transactionapi.repository.TradeHistoryRepository;
 import com.transactionapi.repository.TradeRepository;
+import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,10 +41,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -115,19 +119,28 @@ public class TradeService {
             TradeSortField sortBy,
             TradeSortDirection sortDirection
     ) {
+        return listTrades(userId, page, size, month, day, sortBy, sortDirection, List.of(), false, null);
+    }
+
+    public PagedResponse<TradeResponse> listTrades(
+            String userId,
+            int page,
+            int size,
+            YearMonth month,
+            LocalDate day,
+            TradeSortField sortBy,
+            TradeSortDirection sortDirection,
+            List<UUID> accountIds,
+            boolean includeUnassignedAccounts,
+            String symbolQuery
+    ) {
         int boundedSize = Math.min(Math.max(size, 1), 100);
         Sort sort = buildSort(sortBy, sortDirection);
         Pageable pageable = PageRequest.of(Math.max(page, 0), boundedSize, sort);
-        Page<Trade> result;
-        if (day != null) {
-            result = tradeRepository.findByUserIdAndClosedAt(userId, day, pageable);
-        } else if (month != null) {
-            LocalDate start = month.atDay(1);
-            LocalDate end = month.atEndOfMonth();
-            result = tradeRepository.findByUserIdAndClosedAtBetween(userId, start, end, pageable);
-        } else {
-            result = tradeRepository.findByUserId(userId, pageable);
-        }
+        Page<Trade> result = tradeRepository.findAll(
+                buildTradeFilterSpecification(userId, month, day, accountIds, includeUnassignedAccounts, symbolQuery),
+                pageable
+        );
         List<TradeResponse> items = result.getContent().stream()
                 .map(this::toResponse)
                 .toList();
@@ -140,6 +153,63 @@ public class TradeService {
                 result.hasNext(),
                 result.hasPrevious()
         );
+    }
+
+    private Specification<Trade> buildTradeFilterSpecification(
+            String userId,
+            YearMonth month,
+            LocalDate day,
+            List<UUID> accountIds,
+            boolean includeUnassignedAccounts,
+            String symbolQuery
+    ) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("userId"), userId));
+
+            if (day != null) {
+                predicates.add(criteriaBuilder.equal(root.get("closedAt"), day));
+            } else if (month != null) {
+                predicates.add(criteriaBuilder.between(
+                        root.get("closedAt"),
+                        month.atDay(1),
+                        month.atEndOfMonth()
+                ));
+            }
+
+            List<UUID> selectedAccountIds = accountIds == null ? List.of() : accountIds.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            if (!selectedAccountIds.isEmpty() || includeUnassignedAccounts) {
+                List<Predicate> accountPredicates = new ArrayList<>();
+                if (!selectedAccountIds.isEmpty()) {
+                    accountPredicates.add(root.get("accountId").in(selectedAccountIds));
+                }
+                if (includeUnassignedAccounts) {
+                    accountPredicates.add(criteriaBuilder.isNull(root.get("accountId")));
+                }
+                predicates.add(criteriaBuilder.or(accountPredicates.toArray(Predicate[]::new)));
+            }
+
+            if (StringUtils.hasText(symbolQuery)) {
+                String normalizedSymbol = escapeLike(symbolQuery.trim().toUpperCase(Locale.ROOT));
+                predicates.add(criteriaBuilder.like(
+                        criteriaBuilder.upper(root.get("symbol")),
+                        "%" + normalizedSymbol + "%",
+                        '\\'
+                ));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private String escapeLike(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private Sort buildSort(TradeSortField requestedField, TradeSortDirection requestedDirection) {
