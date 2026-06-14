@@ -10,6 +10,7 @@ import com.transactionapi.model.User;
 import com.transactionapi.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,18 @@ public class UserService {
             }
             return userRepository.save(user);
         });
+    }
+
+    public User acceptLegalAgreement(String authId, String email) {
+        User user = getOrCreateUser(authId, email);
+        Instant now = Instant.now();
+        user.setTermsAcceptedAt(now);
+        user.setPrivacyPolicyAcceptedAt(now);
+        return userRepository.save(user);
+    }
+
+    public boolean hasAcceptedLegalAgreement(User user) {
+        return user.getTermsAcceptedAt() != null && user.getPrivacyPolicyAcceptedAt() != null;
     }
 
     public User updatePreferences(

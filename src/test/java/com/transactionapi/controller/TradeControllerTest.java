@@ -14,6 +14,7 @@ import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.TradeRequest;
+import com.transactionapi.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class TradeControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserService userService;
 
     @Test
     void createsListsAndSummarizesTrades() throws Exception {
@@ -546,6 +550,8 @@ class TradeControllerTest {
     void jwtUserCannotAccessAnotherJwtUsersTrades() throws Exception {
         String userA = "google-sub-trade-owner";
         String userB = "google-sub-trade-other";
+        userService.acceptLegalAgreement(userA, "owner@example.com");
+        userService.acceptLegalAgreement(userB, "other@example.com");
 
         TradeRequest trade = new TradeRequest(
                 "AAPL",

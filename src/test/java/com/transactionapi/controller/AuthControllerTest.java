@@ -66,6 +66,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.termsAcceptedAt").doesNotExist())
+                .andExpect(jsonPath("$.privacyPolicyAcceptedAt").doesNotExist())
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
@@ -74,6 +76,40 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
                 .andExpect(jsonPath("$.email").value("user@example.com"));
+    }
+
+    @Test
+    void authenticatedSessionRequiresLegalAgreementBeforeProtectedApiUse() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .subject("google-sub-legal")
+                .claim("email", "legal@example.com")
+                .claim("name", "Legal User")
+                .build();
+        when(jwtDecoder.decode("google-id-token")).thenReturn(jwt);
+
+        MvcResult loginResult = loginWithCsrf("google-id-token")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.termsAcceptedAt").doesNotExist())
+                .andExpect(jsonPath("$.privacyPolicyAcceptedAt").doesNotExist())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+
+        mockMvc.perform(get(ApiPaths.TRADES + "/summary").session(session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Terms of Service and Privacy Policy agreement required"));
+
+        mockMvc.perform(
+                        post(ApiPaths.USER_LEGAL_AGREEMENT)
+                                .session(session)
+                                .with(csrf())
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.termsAcceptedAt").isNotEmpty())
+                .andExpect(jsonPath("$.privacyPolicyAcceptedAt").isNotEmpty());
+
+        mockMvc.perform(get(ApiPaths.TRADES + "/summary").session(session))
+                .andExpect(status().isOk());
     }
 
     @Test
