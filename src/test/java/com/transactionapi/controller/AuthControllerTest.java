@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.security.admin-emails=admin@example.com")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest {
@@ -78,6 +78,40 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.admin").value(false));
+    }
+
+    @Test
+    void configuredAdminGetsAdminProfileOnLoginProfileAndLegalAcceptance() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .subject("google-sub-admin")
+                .claim("email", "admin@example.com")
+                .claim("name", "Admin User")
+                .build();
+        when(jwtDecoder.decode("google-id-token")).thenReturn(jwt);
+
+        MvcResult loginResult = loginWithCsrf("google-id-token")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-admin"))
+                .andExpect(jsonPath("$.email").value("admin@example.com"))
+                .andExpect(jsonPath("$.admin").value(true))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+
+        mockMvc.perform(get(ApiPaths.USER_ME).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.admin").value(true));
+
+        mockMvc.perform(
+                        post(ApiPaths.USER_LEGAL_AGREEMENT)
+                                .session(session)
+                                .with(csrf())
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.admin").value(true))
+                .andExpect(jsonPath("$.termsAcceptedAt").isNotEmpty())
+                .andExpect(jsonPath("$.privacyPolicyAcceptedAt").isNotEmpty());
     }
 
     @Test
