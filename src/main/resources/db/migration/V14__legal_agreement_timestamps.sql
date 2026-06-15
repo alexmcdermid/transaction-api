@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN terms_accepted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE users ADD COLUMN privacy_policy_accepted_at TIMESTAMP WITH TIME ZONE;

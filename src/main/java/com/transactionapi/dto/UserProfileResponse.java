@@ -27,7 +27,9 @@ public record UserProfileResponse(
         List<DashboardWidget> dashboardWidgets,
         Currency displayCurrency,
         BigDecimal taxCapitalGainsRate,
-        BigDecimal taxPersonalRate
+        BigDecimal taxPersonalRate,
+        Instant termsAcceptedAt,
+        Instant privacyPolicyAcceptedAt
 ) {
     public static UserProfileResponse from(User user) {
         ThemeMode themeMode = user.getThemeMode() != null ? user.getThemeMode() : ThemeMode.LIGHT;
@@ -53,7 +55,9 @@ public record UserProfileResponse(
                 DashboardWidget.fromStorage(user.getDashboardWidgets()),
                 user.getDisplayCurrency() != null ? user.getDisplayCurrency() : Currency.USD,
                 user.getTaxCapitalGainsRate(),
-                user.getTaxPersonalRate()
+                user.getTaxPersonalRate(),
+                user.getTermsAcceptedAt(),
+                user.getPrivacyPolicyAcceptedAt()
         );
     }
 }

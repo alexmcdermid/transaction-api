@@ -77,6 +77,7 @@ class ShareLinkControllerTest {
 
         when(userIdResolver.requireUserId(any())).thenReturn(USER_ID);
         when(userIdResolver.resolveEmail(any())).thenReturn("test@example.com");
+        when(userService.hasAcceptedLegalAgreement(any())).thenReturn(true);
         doNothing().when(userService).ensureUserExists(anyString(), anyString());
     }
 

@@ -71,6 +71,12 @@ public class User {
     @Column(name = "tax_personal_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal taxPersonalRate = new BigDecimal("50.00");
 
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
+    @Column(name = "privacy_policy_accepted_at")
+    private Instant privacyPolicyAcceptedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -187,6 +193,22 @@ public class User {
 
     public void setTaxPersonalRate(BigDecimal taxPersonalRate) {
         this.taxPersonalRate = taxPersonalRate;
+    }
+
+    public Instant getTermsAcceptedAt() {
+        return termsAcceptedAt;
+    }
+
+    public void setTermsAcceptedAt(Instant termsAcceptedAt) {
+        this.termsAcceptedAt = termsAcceptedAt;
+    }
+
+    public Instant getPrivacyPolicyAcceptedAt() {
+        return privacyPolicyAcceptedAt;
+    }
+
+    public void setPrivacyPolicyAcceptedAt(Instant privacyPolicyAcceptedAt) {
+        this.privacyPolicyAcceptedAt = privacyPolicyAcceptedAt;
     }
 
     public Instant getCreatedAt() {

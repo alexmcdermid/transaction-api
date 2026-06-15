@@ -6,6 +6,7 @@ import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.UserService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,5 +27,12 @@ public class UserController {
         String userId = userIdResolver.requireUserId(authentication);
         String email = userIdResolver.resolveEmail(authentication);
         return UserProfileResponse.from(userService.getOrCreateUser(userId, email));
+    }
+
+    @PostMapping("/legal-agreement")
+    public UserProfileResponse acceptLegalAgreement(Authentication authentication) {
+        String userId = userIdResolver.requireUserId(authentication);
+        String email = userIdResolver.resolveEmail(authentication);
+        return UserProfileResponse.from(userService.acceptLegalAgreement(userId, email));
     }
 }

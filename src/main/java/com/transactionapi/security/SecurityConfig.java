@@ -34,6 +34,7 @@ public class SecurityConfig {
 
     private final HeaderUserAuthenticationFilter headerUserAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final LegalAgreementFilter legalAgreementFilter;
     private final Environment environment;
 
     @Value("${app.security.jwt.enabled:false}")
@@ -53,11 +54,13 @@ public class SecurityConfig {
     public SecurityConfig(
             HeaderUserAuthenticationFilter headerUserAuthenticationFilter,
             RateLimitingFilter rateLimitingFilter,
+            LegalAgreementFilter legalAgreementFilter,
             ObjectProvider<JwtDecoder> jwtDecoderProvider,
             Environment environment
     ) {
         this.headerUserAuthenticationFilter = headerUserAuthenticationFilter;
         this.rateLimitingFilter = rateLimitingFilter;
+        this.legalAgreementFilter = legalAgreementFilter;
         this.jwtDecoderProvider = jwtDecoderProvider;
         this.environment = environment;
     }
@@ -88,6 +91,7 @@ public class SecurityConfig {
         }
         http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(rateLimitingFilter, HeaderUserAuthenticationFilter.class);
+        http.addFilterAfter(legalAgreementFilter, RateLimitingFilter.class);
         return http.build();
     }
 
