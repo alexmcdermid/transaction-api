@@ -23,7 +23,7 @@ jobs:
       - name: Build backend image for scan
         run: docker build -t transaction-api:${{ github.sha }} -f Dockerfile .
       - name: Scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: transaction-api:${{ github.sha }}
           vuln-type: os,library
