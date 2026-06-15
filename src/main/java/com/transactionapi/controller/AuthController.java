@@ -104,7 +104,7 @@ public class AuthController {
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
 
-        return UserProfileResponse.from(user);
+        return UserProfileResponse.from(user, userIdResolver.isAdmin(jwtAuthentication));
     }
 
     @PostMapping("/logout")

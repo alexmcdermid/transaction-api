@@ -68,7 +68,7 @@ public class ShareLinkService {
                     if (!link.isRequiresAuth()) {
                         return true;
                     }
-                    return requestingUserId != null && !requestingUserId.isBlank();
+                    return link.getUserId().equals(requestingUserId);
                 })
                 .map(link -> {
                     link.setAccessCount(link.getAccessCount() + 1);

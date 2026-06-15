@@ -85,6 +85,14 @@ class UserIdResolverTest {
         userIdResolver.requireAdmin(auth);
     }
 
+    @Test
+    void reportsAdminStatusWithoutThrowing() {
+        configureEmails("", "admin@example.com");
+
+        assertThat(userIdResolver.isAdmin(buildAuth("sub-6", "admin@example.com"))).isTrue();
+        assertThat(userIdResolver.isAdmin(buildAuth("sub-7", "user@example.com"))).isFalse();
+    }
+
     private void configureAllowlist(String allowed) {
         configureEmails(allowed, "");
     }

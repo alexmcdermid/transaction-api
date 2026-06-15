@@ -16,6 +16,7 @@ public record UserProfileResponse(
         UUID id,
         String authId,
         String email,
+        boolean admin,
         boolean premium,
         Instant createdAt,
         Instant updatedAt,
@@ -32,6 +33,10 @@ public record UserProfileResponse(
         Instant privacyPolicyAcceptedAt
 ) {
     public static UserProfileResponse from(User user) {
+        return from(user, false);
+    }
+
+    public static UserProfileResponse from(User user, boolean admin) {
         ThemeMode themeMode = user.getThemeMode() != null ? user.getThemeMode() : ThemeMode.LIGHT;
         PnlDisplayMode pnlDisplayMode = user.getPnlDisplayMode() != null ? user.getPnlDisplayMode() : PnlDisplayMode.PNL;
         TradeSortField defaultTradeSortBy = user.getDefaultTradeSortBy() != null
@@ -44,6 +49,7 @@ public record UserProfileResponse(
                 user.getId(),
                 user.getAuthId(),
                 user.getEmail(),
+                admin,
                 user.isPremium(),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),

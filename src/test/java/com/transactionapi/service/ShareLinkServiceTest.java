@@ -136,7 +136,7 @@ class ShareLinkServiceTest {
     }
 
     @Test
-    void getShareLink_authRequired_shouldReturnForAuthenticatedUser() {
+    void getShareLink_authRequired_shouldReturnForOwner() {
         when(shareLinkRepository.findByCode("xyz98765")).thenReturn(Optional.of(authRequiredShare));
         when(shareLinkRepository.save(any(ShareLink.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -145,6 +145,16 @@ class ShareLinkServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().getCode()).isEqualTo("xyz98765");
         assertThat(result.get().getAccessCount()).isEqualTo(1);
+    }
+
+    @Test
+    void getShareLink_authRequired_shouldNotReturnForDifferentAuthenticatedUser() {
+        when(shareLinkRepository.findByCode("xyz98765")).thenReturn(Optional.of(authRequiredShare));
+
+        Optional<ShareLink> result = shareLinkService.getShareLink("xyz98765", "user2");
+
+        assertThat(result).isEmpty();
+        verify(shareLinkRepository, never()).save(any(ShareLink.class));
     }
 
     @Test
