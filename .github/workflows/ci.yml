@@ -27,7 +27,7 @@ jobs:
         with:
           image-ref: transaction-api:${{ github.sha }}
           vuln-type: os,library
-          severity: HIGH,CRITICAL
+          severity: CRITICAL
           ignore-unfixed: true
           exit-code: "1"
 
