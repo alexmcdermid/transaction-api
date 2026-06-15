@@ -168,6 +168,16 @@ class ShareLinkControllerTest {
     }
 
     @Test
+    @WithMockUser
+    void getShareLink_authRequired_differentAuthenticatedUser_shouldReturn404() throws Exception {
+        when(shareLinkService.getShareLink(eq("xyz98765"), eq(USER_ID)))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get(ApiPaths.SHARES + "/xyz98765"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void getShareLink_notFound_shouldReturn404() throws Exception {
         when(shareLinkService.getShareLink(eq("notfound"), isNull()))
                 .thenReturn(Optional.empty());

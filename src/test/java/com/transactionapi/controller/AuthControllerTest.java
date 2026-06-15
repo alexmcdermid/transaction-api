@@ -66,6 +66,7 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.admin").value(false))
                 .andExpect(jsonPath("$.termsAcceptedAt").doesNotExist())
                 .andExpect(jsonPath("$.privacyPolicyAcceptedAt").doesNotExist())
                 .andReturn();
@@ -75,7 +76,8 @@ class AuthControllerTest {
         mockMvc.perform(get(ApiPaths.USER_ME).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
-                .andExpect(jsonPath("$.email").value("user@example.com"));
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.admin").value(false));
     }
 
     @Test

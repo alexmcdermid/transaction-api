@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,6 +18,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private final RateLimiterService rateLimiterService;
     private final UserIdResolver userIdResolver;
+
+    @Value("${app.rate-limit.trust-forwarded-headers:false}")
+    private boolean trustForwardedHeaders;
 
     public RateLimitingFilter(RateLimiterService rateLimiterService, UserIdResolver userIdResolver) {
         this.rateLimiterService = rateLimiterService;
@@ -70,6 +74,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
+        if (!trustForwardedHeaders) {
+            return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+        }
+
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getHeader("X-Real-IP");

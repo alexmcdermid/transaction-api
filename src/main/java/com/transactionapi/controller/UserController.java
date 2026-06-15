@@ -2,6 +2,7 @@ package com.transactionapi.controller;
 
 import com.transactionapi.constants.ApiPaths;
 import com.transactionapi.dto.UserProfileResponse;
+import com.transactionapi.model.User;
 import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.UserService;
 import org.springframework.security.core.Authentication;
@@ -26,13 +27,15 @@ public class UserController {
     public UserProfileResponse getProfile(Authentication authentication) {
         String userId = userIdResolver.requireUserId(authentication);
         String email = userIdResolver.resolveEmail(authentication);
-        return UserProfileResponse.from(userService.getOrCreateUser(userId, email));
+        User user = userService.getOrCreateUser(userId, email);
+        return UserProfileResponse.from(user, userIdResolver.isAdmin(authentication));
     }
 
     @PostMapping("/legal-agreement")
     public UserProfileResponse acceptLegalAgreement(Authentication authentication) {
         String userId = userIdResolver.requireUserId(authentication);
         String email = userIdResolver.resolveEmail(authentication);
-        return UserProfileResponse.from(userService.acceptLegalAgreement(userId, email));
+        User user = userService.acceptLegalAgreement(userId, email);
+        return UserProfileResponse.from(user, userIdResolver.isAdmin(authentication));
     }
 }

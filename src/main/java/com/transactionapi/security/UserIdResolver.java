@@ -80,6 +80,14 @@ public class UserIdResolver {
         }
     }
 
+    public boolean isAdmin(Authentication authentication) {
+        if (adminEmailSet.isEmpty()) {
+            return false;
+        }
+        String email = resolveEmail(authentication);
+        return StringUtils.hasText(email) && adminEmailSet.contains(email.toLowerCase());
+    }
+
     private void enforceAllowedEmails(Authentication authentication) {
         if (allowedEmailSet.isEmpty()) {
             return;

@@ -20,6 +20,16 @@ jobs:
           cache: maven
       - name: Run tests
         run: mvn -B -ntp test
+      - name: Build backend image for scan
+        run: docker build -t transaction-api:${{ github.sha }} -f Dockerfile .
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: transaction-api:${{ github.sha }}
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
 
   deploy-dev:
     needs: test
