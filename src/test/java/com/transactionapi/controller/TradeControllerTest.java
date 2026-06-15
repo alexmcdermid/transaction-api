@@ -17,6 +17,7 @@ import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -165,6 +166,24 @@ class TradeControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].symbol").value("TSLA"));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("symbol", "ap")
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].symbol").value("AAPL"));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("accountId", UUID.randomUUID().toString())
+                                .header("X-User-Id", USER_ID)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     @Test

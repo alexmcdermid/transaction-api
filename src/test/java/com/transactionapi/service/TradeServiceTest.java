@@ -587,6 +587,144 @@ class TradeServiceTest {
     }
 
     @Test
+    void paginatesTradesUsingAccountAndSymbolFilters() {
+        Account wealthsimple = new Account();
+        wealthsimple.setUserId(USER_ID);
+        wealthsimple.setName("Wealthsimple");
+        wealthsimple.setDefaultStockFees(BigDecimal.ZERO);
+        wealthsimple.setDefaultOptionFees(BigDecimal.ZERO);
+        wealthsimple.setDefaultMarginRateUsd(BigDecimal.ZERO);
+        wealthsimple.setDefaultMarginRateCad(BigDecimal.ZERO);
+        Account savedWealthsimple = accountRepository.save(wealthsimple);
+
+        Account webull = new Account();
+        webull.setUserId(USER_ID);
+        webull.setName("Webull");
+        webull.setDefaultStockFees(BigDecimal.ZERO);
+        webull.setDefaultOptionFees(BigDecimal.ZERO);
+        webull.setDefaultMarginRateUsd(BigDecimal.ZERO);
+        webull.setDefaultMarginRateCad(BigDecimal.ZERO);
+        Account savedWebull = accountRepository.save(webull);
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        savedWealthsimple.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "MSFT",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        savedWealthsimple.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 11),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        savedWebull.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 12),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "TSLA",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        1,
+                        new BigDecimal("1"),
+                        new BigDecimal("2"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 13),
+                        null
+                ),
+                USER_ID
+        );
+
+        PagedResponse<TradeResponse> selectedAccountAndSymbol = tradeService.listTrades(
+                USER_ID,
+                0,
+                10,
+                null,
+                null,
+                TradeSortField.SYMBOL,
+                TradeSortDirection.ASC,
+                List.of(savedWealthsimple.getId()),
+                false,
+                "aap"
+        );
+        assertThat(selectedAccountAndSymbol.items()).extracting(TradeResponse::symbol)
+                .containsExactly("AAPL");
+        assertThat(selectedAccountAndSymbol.items().getFirst().accountId())
+                .isEqualTo(savedWealthsimple.getId());
+
+        PagedResponse<TradeResponse> selectedAccountAndUnassigned = tradeService.listTrades(
+                USER_ID,
+                0,
+                10,
+                null,
+                null,
+                TradeSortField.SYMBOL,
+                TradeSortDirection.ASC,
+                List.of(savedWealthsimple.getId()),
+                true,
+                null
+        );
+        assertThat(selectedAccountAndUnassigned.items()).extracting(TradeResponse::symbol)
+                .containsExactly("AAPL", "MSFT", "TSLA");
+    }
+
+    @Test
     void paginatesWithinMonthWhenRequested() {
         tradeService.createTrade(
                 new TradeRequest(
