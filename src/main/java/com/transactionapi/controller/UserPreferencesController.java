@@ -47,6 +47,7 @@ public class UserPreferencesController {
                                 && request.defaultTradeSortBy() == null
                                 && request.defaultTradeSortDirection() == null
                                 && request.showTradeHistory() == null
+                                && request.showDetailedTradeTimes() == null
                                 && request.dashboardWidgets() == null
                                 && request.displayCurrency() == null
                                 && request.taxCapitalGainsRate() == null
@@ -66,6 +67,7 @@ public class UserPreferencesController {
                         request.defaultTradeSortBy(),
                         request.defaultTradeSortDirection(),
                         request.showTradeHistory(),
+                        request.showDetailedTradeTimes(),
                         request.dashboardWidgets(),
                         request.displayCurrency(),
                         request.taxCapitalGainsRate(),

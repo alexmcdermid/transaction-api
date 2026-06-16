@@ -1039,6 +1039,8 @@ public class TradeService {
                 pnlPercent,
                 trade.getNotes(),
                 trade.getCreatedAt(),
+                trade.getUpdatedAt(),
+                trade.getCreatedAt(),
                 trade.getUpdatedAt()
         );
     }

@@ -58,6 +58,9 @@ public class User {
     @Column(name = "show_trade_history", nullable = false)
     private boolean showTradeHistory = false;
 
+    @Column(name = "show_detailed_trade_times", nullable = false)
+    private boolean showDetailedTradeTimes = false;
+
     @Column(name = "dashboard_widgets", nullable = false, length = 256)
     private String dashboardWidgets = DashboardWidget.defaultStorageValue();
 
@@ -161,6 +164,14 @@ public class User {
 
     public void setShowTradeHistory(boolean showTradeHistory) {
         this.showTradeHistory = showTradeHistory;
+    }
+
+    public boolean isShowDetailedTradeTimes() {
+        return showDetailedTradeTimes;
+    }
+
+    public void setShowDetailedTradeTimes(boolean showDetailedTradeTimes) {
+        this.showDetailedTradeTimes = showDetailedTradeTimes;
     }
 
     public String getDashboardWidgets() {

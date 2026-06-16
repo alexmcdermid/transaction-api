@@ -29,6 +29,8 @@ public record TradeResponse(
         BigDecimal realizedPnl,
         BigDecimal pnlPercent,
         String notes,
+        Instant inferredOpenedAt,
+        Instant inferredClosedAt,
         Instant createdAt,
         Instant updatedAt
 ) {

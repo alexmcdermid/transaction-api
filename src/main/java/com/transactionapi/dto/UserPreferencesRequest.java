@@ -18,6 +18,7 @@ public record UserPreferencesRequest(
         TradeSortField defaultTradeSortBy,
         TradeSortDirection defaultTradeSortDirection,
         Boolean showTradeHistory,
+        Boolean showDetailedTradeTimes,
         List<@NotNull DashboardWidget> dashboardWidgets,
         Currency displayCurrency,
         @DecimalMin("0.00") @DecimalMax("100.00") BigDecimal taxCapitalGainsRate,
