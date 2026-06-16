@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByAuthId(String authId);
+    Optional<User> findByStripeCustomerId(String stripeCustomerId);
+    Optional<User> findByStripeSubscriptionId(String stripeSubscriptionId);
 }

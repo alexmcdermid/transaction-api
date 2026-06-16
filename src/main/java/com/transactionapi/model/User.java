@@ -39,6 +39,15 @@ public class User {
     @Column(name = "premium", nullable = false)
     private boolean premium = false;
 
+    @Column(name = "stripe_customer_id", unique = true, length = 255)
+    private String stripeCustomerId;
+
+    @Column(name = "stripe_subscription_id", unique = true, length = 255)
+    private String stripeSubscriptionId;
+
+    @Column(name = "stripe_subscription_status", length = 64)
+    private String stripeSubscriptionStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "theme_mode", length = 16)
     private ThemeMode themeMode;
@@ -121,6 +130,30 @@ public class User {
 
     public void setPremium(boolean premium) {
         this.premium = premium;
+    }
+
+    public String getStripeCustomerId() {
+        return stripeCustomerId;
+    }
+
+    public void setStripeCustomerId(String stripeCustomerId) {
+        this.stripeCustomerId = stripeCustomerId;
+    }
+
+    public String getStripeSubscriptionId() {
+        return stripeSubscriptionId;
+    }
+
+    public void setStripeSubscriptionId(String stripeSubscriptionId) {
+        this.stripeSubscriptionId = stripeSubscriptionId;
+    }
+
+    public String getStripeSubscriptionStatus() {
+        return stripeSubscriptionStatus;
+    }
+
+    public void setStripeSubscriptionStatus(String stripeSubscriptionStatus) {
+        this.stripeSubscriptionStatus = stripeSubscriptionStatus;
     }
 
     public ThemeMode getThemeMode() {
