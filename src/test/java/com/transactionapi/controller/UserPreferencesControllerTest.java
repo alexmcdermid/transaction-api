@@ -47,6 +47,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("CLOSED_AT"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("DESC"))
                 .andExpect(jsonPath("$.showTradeHistory").value(false))
+                .andExpect(jsonPath("$.showDetailedTradeTimes").value(false))
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("BEST_MONTH"))
                 .andExpect(jsonPath("$.dashboardWidgets[2]").value("BEST_DAY"))
@@ -62,6 +63,7 @@ class UserPreferencesControllerTest {
                 PnlDisplayMode.PERCENT,
                 TradeSortField.SYMBOL,
                 TradeSortDirection.ASC,
+                true,
                 true,
                 List.of(DashboardWidget.TOTAL_REALIZED, DashboardWidget.TAX_OWED),
                 Currency.CAD,
@@ -80,6 +82,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
                 .andExpect(jsonPath("$.showTradeHistory").value(true))
+                .andExpect(jsonPath("$.showDetailedTradeTimes").value(true))
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
                 .andExpect(jsonPath("$.displayCurrency").value("CAD"))
@@ -96,6 +99,7 @@ class UserPreferencesControllerTest {
                 .andExpect(jsonPath("$.defaultTradeSortBy").value("SYMBOL"))
                 .andExpect(jsonPath("$.defaultTradeSortDirection").value("ASC"))
                 .andExpect(jsonPath("$.showTradeHistory").value(true))
+                .andExpect(jsonPath("$.showDetailedTradeTimes").value(true))
                 .andExpect(jsonPath("$.dashboardWidgets[0]").value("TOTAL_REALIZED"))
                 .andExpect(jsonPath("$.dashboardWidgets[1]").value("TAX_OWED"))
                 .andExpect(jsonPath("$.displayCurrency").value("CAD"))

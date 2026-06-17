@@ -172,6 +172,54 @@ class TradeServiceTest {
     }
 
     @Test
+    void returnsDetailedTradeTimesFromTradeAuditTimestamps() {
+        TradeRequest createdRequest = new TradeRequest(
+                "AAPL",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                10,
+                new BigDecimal("100.00"),
+                new BigDecimal("102.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2024, 5, 1),
+                LocalDate.of(2024, 5, 2),
+                "initial"
+        );
+
+        TradeResponse created = tradeService.createTrade(createdRequest, USER_ID);
+        assertThat(created.inferredOpenedAt()).isEqualTo(created.createdAt());
+        assertThat(created.inferredClosedAt()).isEqualTo(created.updatedAt());
+
+        TradeResponse updated = tradeService.updateTrade(
+                created.id(),
+                new TradeRequest(
+                        "AAPL",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("100.00"),
+                        new BigDecimal("102.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 5, 1),
+                        LocalDate.of(2024, 5, 2),
+                        "notes only"
+                ),
+                USER_ID
+        );
+
+        assertThat(updated.inferredOpenedAt()).isEqualTo(updated.createdAt());
+        assertThat(updated.inferredClosedAt()).isEqualTo(updated.updatedAt());
+    }
+
+    @Test
     void createsTradeWithoutAccountWhenAccountIsNotProvided() {
         TradeRequest request = new TradeRequest(
                 "NVDA",

@@ -66,6 +66,7 @@ public class UserService {
             TradeSortField defaultTradeSortBy,
             TradeSortDirection defaultTradeSortDirection,
             Boolean showTradeHistory,
+            Boolean showDetailedTradeTimes,
             List<DashboardWidget> dashboardWidgets,
             Currency displayCurrency,
             BigDecimal taxCapitalGainsRate,
@@ -86,6 +87,9 @@ public class UserService {
         }
         if (showTradeHistory != null) {
             user.setShowTradeHistory(showTradeHistory);
+        }
+        if (showDetailedTradeTimes != null) {
+            user.setShowDetailedTradeTimes(showDetailedTradeTimes);
         }
         if (dashboardWidgets != null) {
             user.setDashboardWidgets(DashboardWidget.toStorage(dashboardWidgets));
