@@ -127,18 +127,20 @@ Optional:
 
 ## CI/CD (GitHub Actions)
 
-CI runs on push/PR. Dev deploys automatically on `main` after tests pass. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
+CI runs on push/PR. Dev deploys automatically on `main` after tests pass, and the PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Cleanup pauses dev App Runner after merge/prod handoff when no open PR still needs shared dev. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
 
 ### Required GitHub Secrets (Dev)
 - `AWS_REGION`
 - `AWS_ROLE_ARN`
 - `DEV_ECR_TRANSACTION_API_REPO`
 - `DEV_BACKEND_SERVICE_ARN` (App Runner service ARN)
+- `DEV_FRONTEND_SERVICE_ARN` (needed for PR lifecycle resume/pause)
 - `DEV_DATABASE_URL`
 - `DEV_CORS_ALLOWED_ORIGINS`
 - `DEV_ALLOWED_EMAILS` (optional)
 - `DEV_ADMIN_EMAILS` (optional)
 - `DEV_GOOGLE_CLIENT_ID`
+- `CROSS_REPO_PR_READ_TOKEN` (optional fallback for cross-repo shared-dev cleanup)
 
 For the current dev frontend domain:
 ```text
@@ -168,8 +170,15 @@ If `https://tradelog.ca` also reaches the frontend app, include it as a second a
 Role permissions for App Runner deploys must include:
 - `apprunner:UpdateService`
 - `apprunner:DescribeService`
+- `apprunner:ResumeService` for PR deploys when dev is paused
+- `apprunner:PauseService` for post-merge shared-dev cleanup
 
 ## Architecture
+
+### Dev App Runner PR Lifecycle
+- Goal: leave Neon running, but pause dev frontend/backend App Runner when shared dev is idle.
+- PRs should resume both dev App Runner services and deploy the PR image into that repo's dev service.
+- After merge and production deployment handoff, dev App Runner services should pause again.
 
 ### FX Rates (BoC -> DynamoDB -> App Runner)
 - **Goal:** keep App Runner inside a VPC to reach Neon/RDS without requiring outbound internet/NAT for BoC.

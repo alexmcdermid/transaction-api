@@ -49,7 +49,7 @@ Main monthly cost drivers:
 
 Cost levers:
 
-1. Pause dev App Runner services when they are not needed.
+1. Pause dev App Runner services when they are not needed, and resume/deploy them for PR testing.
 2. Use the smallest App Runner CPU/memory shape that runs frontend and backend comfortably.
 3. Keep Neon PrivateLink prod-only.
 4. Keep one subnet/AZ per Neon endpoint until availability matters more than endpoint cost.
@@ -58,6 +58,8 @@ Cost levers:
 7. Keep NAT Gateway out of this design.
 
 For the budget alert and App Runner auto-pause guardrail, see [AWS Budget Guardrail Runbook](aws-budget-guardrail.md).
+
+Neon is intentionally excluded from the PR-driven dev App Runner resume, PR deployment, and pause lifecycle.
 
 ## Deployment Identifiers
 
