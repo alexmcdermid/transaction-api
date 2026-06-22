@@ -157,7 +157,7 @@ If App Runner logs `password authentication failed`, App Runner reached Neon and
 
 ## CI/CD (GitHub Actions)
 
-CI runs on push/PR. Dev deploys automatically on `main` after tests pass, and the PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
+CI runs on push/PR. Pushes to `main` run validation only and do not resume, deploy, or pause shared dev. The PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Prod deploys are manual via `workflow_dispatch`. Deploys update App Runner only from PR dev deploy jobs or manual prod workflows after pushing a new ECR image.
 
 Dev App Runner lifecycle is coordinated across the frontend and backend repos. A same-repository PR resumes both dev services before deploying this repo's backend image, and cleanup pauses both dev services when neither repo has an open PR that still needs shared dev.
 
@@ -268,7 +268,7 @@ If `deploy-pr-dev` fails with `AccessDeniedException` for `apprunner:ResumeServi
 - Goal: leave Neon running, but pause dev frontend/backend App Runner when shared dev is idle.
 - PRs resume both dev App Runner services and deploy the PR image into that repo's dev service.
 - Merge/close cleanup pauses both dev App Runner services only after both repos have no open PRs.
-- Main-branch dev deploys also pause dev again when the cross-repo open PR count is zero.
+- Direct pushes or merges to `main` do not touch dev App Runner; closed-PR cleanup is responsible for pausing dev.
 
 ### FX Rates (BoC -> DynamoDB -> App Runner)
 - **Goal:** keep App Runner inside a VPC to reach Neon/RDS without requiring outbound internet/NAT for BoC.

@@ -117,7 +117,7 @@ pull_request_target: closed
 
 That workflow checks out the base branch, not the PR head, then counts open PRs across both repos. It only pauses dev when the cross-repo open PR count is zero.
 
-Main-branch dev deploys also run the open-PR count after deploying. If the merge leaves no open PRs, the workflow pauses dev again after the dev deployment completes. This gives the merge path a chance to deploy into dev, then returns dev App Runner to the low-cost paused state.
+Direct pushes or merges to `main` do not resume, deploy, or pause shared dev. After a PR merge, the closed-PR cleanup workflow is the path that returns dev App Runner to the paused state when no open PRs remain.
 
 ### What Is And Is Not Scaled
 
