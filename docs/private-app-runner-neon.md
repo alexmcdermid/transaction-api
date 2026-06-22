@@ -61,6 +61,168 @@ For the budget alert and App Runner auto-pause guardrail, see [AWS Budget Guardr
 
 Neon is intentionally excluded from the PR-driven dev App Runner resume, PR deployment, and pause lifecycle.
 
+## Dev App Runner PR Lifecycle
+
+Shared dev App Runner is intentionally not always-on. Dev frontend and backend services are kept deployed, but GitHub Actions resumes them only when active development needs the shared dev environment.
+
+The lifecycle is shared across both repositories:
+
+```text
+frontend PR opened/updated
+  -> resume dev backend + dev frontend
+  -> build/push frontend PR image
+  -> update dev frontend App Runner
+
+backend PR opened/updated
+  -> resume dev backend + dev frontend
+  -> build/push backend PR image
+  -> update dev backend App Runner
+
+PR closed or merged in either repo
+  -> count open PRs across frontend + backend repos
+  -> if count is zero, pause dev frontend + dev backend
+```
+
+### Why One PR Resumes Both Services
+
+Shared dev needs both services online for realistic testing:
+
+- A frontend PR still needs the dev backend API.
+- A backend PR still needs the dev frontend for browser testing.
+- Pausing only one service creates misleading failures and makes the dev URL look broken.
+
+Therefore each repo's PR deploy resumes both App Runner services before deploying that repo's image.
+
+### Workflow Events
+
+The normal CI workflow handles PR deploys:
+
+```text
+pull_request: opened, synchronize, reopened, ready_for_review
+```
+
+Those jobs run only for same-repository PRs:
+
+```text
+github.event.pull_request.head.repo.full_name == github.repository
+```
+
+This keeps AWS deployment secrets away from forked PRs.
+
+Closed-PR cleanup is handled by a separate workflow:
+
+```text
+pull_request_target: closed
+```
+
+That workflow checks out the base branch, not the PR head, then counts open PRs across both repos. It only pauses dev when the cross-repo open PR count is zero.
+
+Main-branch dev deploys also run the open-PR count after deploying. If the merge leaves no open PRs, the workflow pauses dev again after the dev deployment completes. This gives the merge path a chance to deploy into dev, then returns dev App Runner to the low-cost paused state.
+
+### What Is And Is Not Scaled
+
+Scaled by this lifecycle:
+
+- Dev frontend App Runner service.
+- Dev backend App Runner service.
+
+Not scaled by this lifecycle:
+
+- Neon databases.
+- Prod App Runner services.
+- ECR repositories or images.
+- App Runner custom domains.
+- CloudWatch log groups.
+- DynamoDB tables.
+- Neon PrivateLink endpoints.
+
+Pausing App Runner reduces idle App Runner service cost. It does not tear down infrastructure and does not remove persistent data.
+
+### Required GitHub Secrets
+
+Both repos need the opposite service ARN because each repo resumes and pauses both dev services:
+
+Frontend repo:
+
+```text
+DEV_FRONTEND_SERVICE_ARN=<dev-frontend-app-runner-service-arn>
+DEV_BACKEND_SERVICE_ARN=<dev-backend-app-runner-service-arn>
+```
+
+Backend repo:
+
+```text
+DEV_BACKEND_SERVICE_ARN=<dev-backend-app-runner-service-arn>
+DEV_FRONTEND_SERVICE_ARN=<dev-frontend-app-runner-service-arn>
+```
+
+`CROSS_REPO_PR_READ_TOKEN` is optional. If present, workflows use it to count open PRs across both repos. If omitted, workflows fall back to `github.token`, which may be insufficient for cross-repo visibility depending on repository permissions.
+
+### Required IAM Permissions
+
+Each repo's GitHub Actions role must be able to manage the lifecycle for both shared dev App Runner services:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageSharedDevAppRunnerLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "apprunner:DescribeService",
+        "apprunner:ResumeService",
+        "apprunner:PauseService"
+      ],
+      "Resource": [
+        "arn:aws:apprunner:<region>:<account-id>:service/<dev-frontend-service-name>/*",
+        "arn:aws:apprunner:<region>:<account-id>:service/<dev-backend-service-name>/*"
+      ]
+    }
+  ]
+}
+```
+
+Use service-name wildcards for the generated service ID segment. The permission remains scoped to the two dev services, but does not break if a dev App Runner service is recreated.
+
+Keep each repo's existing deploy permissions:
+
+- Frontend role: `apprunner:UpdateService` for the dev frontend service and ECR push/read access for the frontend ECR repo.
+- Backend role: `apprunner:UpdateService` for the dev backend service and ECR push/read access for the backend ECR repo.
+- Both roles: `ecr:GetAuthorizationToken` on `*`.
+
+If GitHub Actions logs say `AccessDeniedException` for `apprunner:ResumeService` or `apprunner:PauseService`, the role has already been assumed. Fix the identity policy attached to the role; do not start with OIDC trust debugging.
+
+### Manual Operations
+
+Manual resume:
+
+```bash
+aws apprunner resume-service --service-arn "<dev-backend-app-runner-service-arn>"
+aws apprunner resume-service --service-arn "<dev-frontend-app-runner-service-arn>"
+```
+
+Manual pause:
+
+```bash
+aws apprunner pause-service --service-arn "<dev-frontend-app-runner-service-arn>"
+aws apprunner pause-service --service-arn "<dev-backend-app-runner-service-arn>"
+```
+
+Check status:
+
+```bash
+aws apprunner describe-service \
+  --service-arn "<dev-backend-app-runner-service-arn>" \
+  --query "Service.Status" \
+  --output text
+
+aws apprunner describe-service \
+  --service-arn "<dev-frontend-app-runner-service-arn>" \
+  --query "Service.Status" \
+  --output text
+```
+
 ## Deployment Identifiers
 
 Do not commit concrete AWS account IDs, VPC IDs, subnet IDs, route table IDs, VPC endpoint IDs, security group IDs, App Runner generated hostnames, Neon organization IDs, Neon project IDs, or production DNS targets.
@@ -278,6 +440,8 @@ Deploy role permissions need:
 - ECR push/read actions on the relevant ECR repos
 - `apprunner:UpdateService`
 - `apprunner:DescribeService`
+- `apprunner:ResumeService` on both dev App Runner services
+- `apprunner:PauseService` on both dev App Runner services
 
 ## Bootstrap Order For New Prod Services
 

@@ -157,9 +157,36 @@ If App Runner logs `password authentication failed`, App Runner reached Neon and
 
 ## CI/CD (GitHub Actions)
 
-CI runs on push/PR. Dev deploys automatically on `main` after tests pass, and the PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Cleanup pauses dev App Runner after merge/prod handoff when no open PR still needs shared dev. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
+CI runs on push/PR. Dev deploys automatically on `main` after tests pass, and the PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Prod deploys are manual via `workflow_dispatch`. Deploys update the App Runner service after pushing a new ECR image.
 
-Dev App Runner lifecycle is coordinated across the frontend and backend repos. A same-repository PR resumes both dev services before deploying this repo's backend image, and cleanup pauses both dev services only when neither repo has an open PR that still needs shared dev.
+Dev App Runner lifecycle is coordinated across the frontend and backend repos. A same-repository PR resumes both dev services before deploying this repo's backend image, and cleanup pauses both dev services when neither repo has an open PR that still needs shared dev.
+
+### Dev PR Deployment Lifecycle
+
+Shared dev is intentionally treated as a PR preview environment, not as always-on infrastructure:
+
+1. A same-repository PR is opened, reopened, marked ready for review, or updated.
+2. GitHub Actions assumes the backend AWS OIDC role through the `dev` GitHub environment.
+3. The workflow resumes both dev App Runner services:
+   - `DEV_BACKEND_SERVICE_ARN`
+   - `DEV_FRONTEND_SERVICE_ARN`
+4. The workflow builds and pushes a PR-tagged backend image:
+   - `pr-<pull-request-number>-<pull-request-head-sha>`
+5. The workflow updates the dev backend App Runner service to that image and runtime configuration.
+6. The frontend dev service continues to call the shared dev backend through `DEV_API_BASE_URL`.
+7. When a PR is closed or merged, the cleanup workflow counts open PRs in both `transaction-api` and `tradingView`.
+8. If the open PR count is zero, cleanup pauses both dev App Runner services.
+
+The frontend repo runs the same lifecycle for frontend PRs, but deploys the frontend image into the shared dev frontend service.
+
+Important behavior:
+- A backend PR resumes both services because dev testing needs both backend and frontend online.
+- A frontend PR also resumes both services for the same reason.
+- Cleanup pauses both services only when both repos have no open PRs. This avoids pausing shared dev while a PR in the other repo still needs it.
+- `pull_request` deploys are restricted to same-repository PRs so AWS secrets are not exposed to forks.
+- `pull_request_target` is used only for closed-PR cleanup, and checks out the base branch instead of the PR head.
+- Neon is not scaled by this lifecycle. Only dev App Runner services are paused/resumed.
+- Pausing App Runner reduces idle service cost, but it does not delete the services, ECR repos, custom domains, logs, or Neon databases.
 
 ### Required GitHub Secrets (Dev)
 - `AWS_REGION`
@@ -205,12 +232,43 @@ Role permissions for App Runner deploys must include:
 - `apprunner:ResumeService` for PR deploys when dev is paused
 - `apprunner:PauseService` for post-merge shared-dev cleanup
 
+The GitHub Actions role for each repo must be allowed to resume and pause both shared dev App Runner services. Use name-scoped App Runner ARNs so a recreated dev service does not require updating the policy service ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageSharedDevAppRunnerLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "apprunner:DescribeService",
+        "apprunner:ResumeService",
+        "apprunner:PauseService"
+      ],
+      "Resource": [
+        "arn:aws:apprunner:<region>:<account-id>:service/<dev-frontend-service-name>/*",
+        "arn:aws:apprunner:<region>:<account-id>:service/<dev-backend-service-name>/*"
+      ]
+    }
+  ]
+}
+```
+
+Keep the existing deploy permissions as well:
+- `apprunner:UpdateService` for this repo's backend App Runner service.
+- ECR push/read permissions for this repo's dev backend repository.
+- `ecr:GetAuthorizationToken` on `*`.
+
+If `deploy-pr-dev` fails with `AccessDeniedException` for `apprunner:ResumeService`, the role was assumed successfully and the issue is the identity policy attached to the GitHub Actions role, not the OIDC trust policy.
+
 ## Architecture
 
 ### Dev App Runner PR Lifecycle
 - Goal: leave Neon running, but pause dev frontend/backend App Runner when shared dev is idle.
-- PRs should resume both dev App Runner services and deploy the PR image into that repo's dev service.
-- After merge and production deployment handoff, dev App Runner services should pause again.
+- PRs resume both dev App Runner services and deploy the PR image into that repo's dev service.
+- Merge/close cleanup pauses both dev App Runner services only after both repos have no open PRs.
+- Main-branch dev deploys also pause dev again when the cross-repo open PR count is zero.
 
 ### FX Rates (BoC -> DynamoDB -> App Runner)
 - **Goal:** keep App Runner inside a VPC to reach Neon/RDS without requiring outbound internet/NAT for BoC.
