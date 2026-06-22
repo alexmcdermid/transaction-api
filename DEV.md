@@ -157,9 +157,9 @@ If App Runner logs `password authentication failed`, App Runner reached Neon and
 
 ## CI/CD (GitHub Actions)
 
-CI runs on push/PR. Pushes to `main` run validation only and do not resume, deploy, or pause shared dev. The PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Prod deploys are manual via `workflow_dispatch`. Deploys update App Runner only from PR dev deploy jobs or manual prod workflows after pushing a new ECR image.
+CI runs on PRs only. Direct pushes or merges to `main` do not run validation here and do not resume, deploy, or pause shared dev. The PR lifecycle deploys PR images into dev for testing after the required IAM/secrets are configured. Prod deploys are manual via `workflow_dispatch`. Deploys update App Runner only from PR dev deploy jobs or manual prod workflows after pushing a new ECR image.
 
-Dev App Runner lifecycle is coordinated across the frontend and backend repos. A same-repository PR resumes both dev services before deploying this repo's backend image, and cleanup pauses both dev services when neither repo has an open PR that still needs shared dev.
+Dev App Runner lifecycle is coordinated across the frontend and backend repos. A same-repository PR resumes both dev services before deploying this repo's backend image, and cleanup pauses both dev services when neither repo has an active same-repo non-draft PR that still needs shared dev.
 
 ### Dev PR Deployment Lifecycle
 
@@ -174,15 +174,15 @@ Shared dev is intentionally treated as a PR preview environment, not as always-o
    - `pr-<pull-request-number>-<pull-request-head-sha>`
 5. The workflow updates the dev backend App Runner service to that image and runtime configuration.
 6. The frontend dev service continues to call the shared dev backend through `DEV_API_BASE_URL`.
-7. When a PR is closed or merged, the cleanup workflow counts open PRs in both `transaction-api` and `tradingView`.
-8. If the open PR count is zero, cleanup pauses both dev App Runner services.
+7. When a PR is closed or merged, the cleanup workflow counts active same-repo non-draft PRs in both `transaction-api` and `tradingView`.
+8. If the active PR count is zero, cleanup pauses both dev App Runner services.
 
 The frontend repo runs the same lifecycle for frontend PRs, but deploys the frontend image into the shared dev frontend service.
 
 Important behavior:
 - A backend PR resumes both services because dev testing needs both backend and frontend online.
 - A frontend PR also resumes both services for the same reason.
-- Cleanup pauses both services only when both repos have no open PRs. This avoids pausing shared dev while a PR in the other repo still needs it.
+- Cleanup pauses both services only when both repos have no active same-repo non-draft PRs. This avoids pausing shared dev while a PR in the other repo still needs it.
 - `pull_request` deploys are restricted to same-repository PRs so AWS secrets are not exposed to forks.
 - `pull_request_target` is used only for closed-PR cleanup, and checks out the base branch instead of the PR head.
 - Neon is not scaled by this lifecycle. Only dev App Runner services are paused/resumed.
@@ -267,8 +267,8 @@ If `deploy-pr-dev` fails with `AccessDeniedException` for `apprunner:ResumeServi
 ### Dev App Runner PR Lifecycle
 - Goal: leave Neon running, but pause dev frontend/backend App Runner when shared dev is idle.
 - PRs resume both dev App Runner services and deploy the PR image into that repo's dev service.
-- Merge/close cleanup pauses both dev App Runner services only after both repos have no open PRs.
-- Direct pushes or merges to `main` do not touch dev App Runner; closed-PR cleanup is responsible for pausing dev.
+- Merge/close cleanup pauses both dev App Runner services only after both repos have no active same-repo non-draft PRs.
+- Direct pushes or merges to `main` do not run this CI workflow or touch dev App Runner; closed-PR cleanup is responsible for pausing dev.
 
 ### FX Rates (BoC -> DynamoDB -> App Runner)
 - **Goal:** keep App Runner inside a VPC to reach Neon/RDS without requiring outbound internet/NAT for BoC.
