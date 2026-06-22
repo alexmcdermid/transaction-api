@@ -79,7 +79,7 @@ backend PR opened/updated
   -> update dev backend App Runner
 
 PR closed or merged in either repo
-  -> count open PRs across frontend + backend repos
+  -> count active same-repo non-draft PRs across frontend + backend repos
   -> if count is zero, pause dev frontend + dev backend
 ```
 
@@ -115,9 +115,9 @@ Closed-PR cleanup is handled by a separate workflow:
 pull_request_target: closed
 ```
 
-That workflow checks out the base branch, not the PR head, then counts open PRs across both repos. It only pauses dev when the cross-repo open PR count is zero.
+That workflow checks out the base branch, not the PR head, then counts active same-repo non-draft PRs across both repos. It only pauses dev when the cross-repo active PR count is zero.
 
-Direct pushes or merges to `main` do not resume, deploy, or pause shared dev. After a PR merge, the closed-PR cleanup workflow is the path that returns dev App Runner to the paused state when no open PRs remain.
+Direct pushes or merges to `main` do not run PR CI/deploy workflows and do not resume, deploy, or pause shared dev. After a PR merge, the closed-PR cleanup workflow is the path that returns dev App Runner to the paused state when no active same-repo non-draft PRs remain.
 
 ### What Is And Is Not Scaled
 
@@ -156,7 +156,7 @@ DEV_BACKEND_SERVICE_ARN=<dev-backend-app-runner-service-arn>
 DEV_FRONTEND_SERVICE_ARN=<dev-frontend-app-runner-service-arn>
 ```
 
-`CROSS_REPO_PR_READ_TOKEN` is optional. If present, workflows use it to count open PRs across both repos. If omitted, workflows fall back to `github.token`, which may be insufficient for cross-repo visibility depending on repository permissions.
+`CROSS_REPO_PR_READ_TOKEN` is optional. If present, workflows use it to count active same-repo non-draft PRs across both repos. If omitted, workflows fall back to `github.token`, which may be insufficient for cross-repo visibility depending on repository permissions.
 
 ### Required IAM Permissions
 
