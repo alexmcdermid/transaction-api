@@ -1,6 +1,7 @@
 package com.transactionapi.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -39,6 +41,9 @@ class AuthControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private Environment environment;
 
     @MockBean
     private JwtDecoder jwtDecoder;
@@ -78,6 +83,60 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.authId").value("google-sub-1"))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.admin").value(false));
+    }
+
+    @Test
+    void sessionCookieDefaultsAreSecureAndPersistent() {
+        assertEquals("true", environment.getProperty("server.servlet.session.cookie.http-only"));
+        assertEquals("PT2H", environment.getProperty("server.servlet.session.cookie.max-age"));
+        assertEquals("true", environment.getProperty("server.servlet.session.cookie.secure"));
+        assertEquals("lax", environment.getProperty("server.servlet.session.cookie.same-site"));
+    }
+
+    @Test
+    void sameUserCanKeepMultipleBrowserSessionsAndLogoutOneOnly() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .subject("google-sub-multi-session")
+                .claim("email", "multi-session@example.com")
+                .claim("name", "Multi Session User")
+                .build();
+        when(jwtDecoder.decode("desktop-token")).thenReturn(jwt);
+        when(jwtDecoder.decode("phone-token")).thenReturn(jwt);
+
+        MvcResult desktopLogin = loginWithCsrf("desktop-token")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-multi-session"))
+                .andReturn();
+        MvcResult phoneLogin = loginWithCsrf("phone-token")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-multi-session"))
+                .andReturn();
+
+        MockHttpSession desktopSession = (MockHttpSession) desktopLogin.getRequest().getSession(false);
+        MockHttpSession phoneSession = (MockHttpSession) phoneLogin.getRequest().getSession(false);
+        assertNotNull(desktopSession);
+        assertNotNull(phoneSession);
+        assertNotEquals(desktopSession.getId(), phoneSession.getId());
+
+        mockMvc.perform(get(ApiPaths.USER_ME).session(desktopSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-multi-session"));
+        mockMvc.perform(get(ApiPaths.USER_ME).session(phoneSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-multi-session"));
+
+        mockMvc.perform(
+                        post(ApiPaths.AUTH_LOGOUT)
+                                .session(desktopSession)
+                                .with(csrf())
+                )
+                .andExpect(status().isNoContent());
+        assertTrue(desktopSession.isInvalid());
+
+        mockMvc.perform(get(ApiPaths.USER_ME).session(phoneSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authId").value("google-sub-multi-session"));
     }
 
     @Test
