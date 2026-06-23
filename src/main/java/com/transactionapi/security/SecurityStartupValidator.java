@@ -26,6 +26,12 @@ public class SecurityStartupValidator {
     @Value("${app.security.admin-emails:}")
     private String adminEmails;
 
+    @Value("${server.servlet.session.cookie.secure:true}")
+    private boolean sessionCookieSecure;
+
+    @Value("${server.servlet.session.cookie.same-site:lax}")
+    private String sessionCookieSameSite;
+
     public SecurityStartupValidator(Environment environment) {
         this.environment = environment;
     }
@@ -49,6 +55,12 @@ public class SecurityStartupValidator {
         if (!StringUtils.hasText(adminEmails)) {
             problems.add("app.security.admin-emails must be set");
         }
+        if (!sessionCookieSecure) {
+            problems.add("server.servlet.session.cookie.secure must be true");
+        }
+        if (!isValidSameSite(sessionCookieSameSite)) {
+            problems.add("server.servlet.session.cookie.same-site must be lax, strict, or none");
+        }
 
         if (!problems.isEmpty()) {
             throw new IllegalStateException(
@@ -56,5 +68,13 @@ public class SecurityStartupValidator {
                             + String.join("; ", problems)
             );
         }
+    }
+
+    private boolean isValidSameSite(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String normalized = value.toLowerCase();
+        return "lax".equals(normalized) || "strict".equals(normalized) || "none".equals(normalized);
     }
 }

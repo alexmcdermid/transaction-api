@@ -49,6 +49,9 @@ public class SecurityConfig {
     @Value("${app.security.header-name:X-User-Id}")
     private String headerName;
 
+    @Value("${server.servlet.session.cookie.secure:true}")
+    private boolean sessionCookieSecure;
+
     private final ObjectProvider<JwtDecoder> jwtDecoderProvider;
 
     public SecurityConfig(
@@ -100,6 +103,7 @@ public class SecurityConfig {
         repository.setCookiePath("/");
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
+        repository.setSecure(sessionCookieSecure);
         return repository;
     }
 

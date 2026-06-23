@@ -63,6 +63,7 @@ Session cookies are configured as:
 - `Secure` by default (`APP_SESSION_COOKIE_SECURE=false` only for local HTTP)
 - `SameSite=Lax` by default (`APP_SESSION_COOKIE_SAME_SITE=lax`)
 - timeout from `APP_SESSION_TIMEOUT` (default `PT2H`)
+- browser persistence from `APP_SESSION_COOKIE_MAX_AGE` (default `PT2H`)
 
 Keep frontend and backend deployments same-site for browser session auth. `https://www.tradelog.ca` or `https://dev.tradelog.ca` talking to an API on another `*.tradelog.ca` hostname is same-site and works with `SameSite=Lax`. If the API is deployed on a different registrable domain, set `APP_SESSION_COOKIE_SAME_SITE=none`, keep `APP_SESSION_COOKIE_SECURE=true`, and re-check the CORS/CSRF deployment path deliberately.
 
@@ -122,6 +123,7 @@ Optional:
 - `APP_RATE_LIMIT_TRUST_FORWARDED_HEADERS=false`
 - `APP_RATE_LIMIT_MAX_BUCKETS=10000`
 - `APP_SESSION_TIMEOUT=PT2H`
+- `APP_SESSION_COOKIE_MAX_AGE=PT2H`
 - `APP_SESSION_COOKIE_SECURE=true`
 - `APP_SESSION_COOKIE_SAME_SITE=lax`
 
