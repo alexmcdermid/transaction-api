@@ -80,6 +80,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", ApiPaths.HEALTH, ApiPaths.AUTH_CSRF, ApiPaths.AUTH_LOGIN, ApiPaths.AUTH_LOGOUT).permitAll()
+                .requestMatchers(HttpMethod.POST, ApiPaths.BILLING_WEBHOOK).permitAll()
                 .requestMatchers(HttpMethod.GET, ApiPaths.SHARES + "/*").permitAll()
                 .anyRequest().authenticated()
         );
@@ -114,6 +115,9 @@ public class SecurityConfig {
                 return false;
             }
             if (StringUtils.hasText(request.getHeader("Authorization"))) {
+                return false;
+            }
+            if (ApiPaths.BILLING_WEBHOOK.equals(request.getRequestURI())) {
                 return false;
             }
             if (allowHeaderAuth
