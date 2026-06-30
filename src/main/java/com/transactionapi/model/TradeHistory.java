@@ -55,8 +55,8 @@ public class TradeHistory {
     @Column(nullable = false, length = 10)
     private TradeDirection direction;
 
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(nullable = false, precision = 24, scale = 10)
+    private BigDecimal quantity;
 
     @Column(name = "entry_price", nullable = false, precision = 18, scale = 4)
     private BigDecimal entryPrice;
@@ -171,7 +171,7 @@ public class TradeHistory {
         return direction;
     }
 
-    public Integer getQuantity() {
+    public BigDecimal getQuantity() {
         return quantity;
     }
 

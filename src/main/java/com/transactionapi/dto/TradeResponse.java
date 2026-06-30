@@ -15,7 +15,7 @@ public record TradeResponse(
         AssetType assetType,
         Currency currency,
         TradeDirection direction,
-        int quantity,
+        BigDecimal quantity,
         BigDecimal entryPrice,
         BigDecimal exitPrice,
         BigDecimal fees,

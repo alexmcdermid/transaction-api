@@ -1,0 +1,5 @@
+ALTER TABLE trades
+    ALTER COLUMN quantity TYPE NUMERIC(24, 10);
+
+ALTER TABLE trade_history
+    ALTER COLUMN quantity TYPE NUMERIC(24, 10);
