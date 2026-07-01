@@ -659,10 +659,10 @@ public class TradeService {
                 previous = current;
                 continue;
             }
-            int previousQuantity = previous.getQuantity() != null ? previous.getQuantity() : 0;
-            int currentQuantity = current.getQuantity() != null ? current.getQuantity() : 0;
-            int quantityDelta = currentQuantity - previousQuantity;
-            if (quantityDelta > 0) {
+            BigDecimal previousQuantity = quantityOrZero(previous);
+            BigDecimal currentQuantity = quantityOrZero(current);
+            BigDecimal quantityDelta = currentQuantity.subtract(previousQuantity);
+            if (quantityDelta.compareTo(BigDecimal.ZERO) > 0) {
                 accumulator.recordAdd(
                         current.getDirection(),
                         quantityDelta,
@@ -675,19 +675,26 @@ public class TradeService {
         }
     }
 
-    private BigDecimal inferAddedEntryPrice(TradeHistory previous, TradeHistory current, int quantityDelta) {
-        if (quantityDelta <= 0 || previous.getEntryPrice() == null || current.getEntryPrice() == null) {
+    private BigDecimal inferAddedEntryPrice(TradeHistory previous, TradeHistory current, BigDecimal quantityDelta) {
+        if (quantityDelta.compareTo(BigDecimal.ZERO) <= 0
+                || previous.getEntryPrice() == null
+                || current.getEntryPrice() == null) {
             return null;
         }
-        int previousQuantity = previous.getQuantity() != null ? previous.getQuantity() : 0;
-        int currentQuantity = current.getQuantity() != null ? current.getQuantity() : 0;
-        if (previousQuantity <= 0 || currentQuantity <= previousQuantity) {
+        BigDecimal previousQuantity = quantityOrZero(previous);
+        BigDecimal currentQuantity = quantityOrZero(current);
+        if (previousQuantity.compareTo(BigDecimal.ZERO) <= 0
+                || currentQuantity.compareTo(previousQuantity) <= 0) {
             return null;
         }
-        BigDecimal currentNotional = current.getEntryPrice().multiply(BigDecimal.valueOf(currentQuantity));
-        BigDecimal previousNotional = previous.getEntryPrice().multiply(BigDecimal.valueOf(previousQuantity));
+        BigDecimal currentNotional = current.getEntryPrice().multiply(currentQuantity);
+        BigDecimal previousNotional = previous.getEntryPrice().multiply(previousQuantity);
         return currentNotional.subtract(previousNotional)
-                .divide(BigDecimal.valueOf(quantityDelta), 4, RoundingMode.HALF_UP);
+                .divide(quantityDelta, 4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal quantityOrZero(TradeHistory history) {
+        return history.getQuantity() != null ? history.getQuantity() : BigDecimal.ZERO;
     }
 
     private boolean sameTradeIdentity(TradeHistory initial, TradeHistory current) {
@@ -742,8 +749,8 @@ public class TradeService {
         private int inferredAddCount;
         private int monthInferredAddCount;
         private int dayInferredAddCount;
-        private int inferredAddedQuantity;
-        private int inferredPricedAddedQuantity;
+        private BigDecimal inferredAddedQuantity = BigDecimal.ZERO;
+        private BigDecimal inferredPricedAddedQuantity = BigDecimal.ZERO;
         private BigDecimal inferredAddedNotional = BigDecimal.ZERO;
 
         InferredAccountTradeCountsAccumulator(UUID accountId, String accountName) {
@@ -764,9 +771,15 @@ public class TradeService {
             recordScopedInferredCount(2, inMonth, onDay);
         }
 
-        void recordAdd(TradeDirection direction, int quantityDelta, BigDecimal inferredPrice, boolean inMonth, boolean onDay) {
+        void recordAdd(
+                TradeDirection direction,
+                BigDecimal quantityDelta,
+                BigDecimal inferredPrice,
+                boolean inMonth,
+                boolean onDay
+        ) {
             inferredAddCount++;
-            inferredAddedQuantity += quantityDelta;
+            inferredAddedQuantity = inferredAddedQuantity.add(quantityDelta);
             if (direction == TradeDirection.SHORT) {
                 inferredSellCount++;
             } else {
@@ -780,8 +793,8 @@ public class TradeService {
                 dayInferredAddCount++;
             }
             if (inferredPrice != null) {
-                inferredPricedAddedQuantity += quantityDelta;
-                inferredAddedNotional = inferredAddedNotional.add(inferredPrice.multiply(BigDecimal.valueOf(quantityDelta)));
+                inferredPricedAddedQuantity = inferredPricedAddedQuantity.add(quantityDelta);
+                inferredAddedNotional = inferredAddedNotional.add(inferredPrice.multiply(quantityDelta));
             }
         }
 
@@ -795,8 +808,8 @@ public class TradeService {
         }
 
         InferredAccountTradeCountsResponse toResponse(int year, YearMonth month, LocalDate day) {
-            BigDecimal averageInferredAddPrice = inferredPricedAddedQuantity > 0
-                    ? inferredAddedNotional.divide(BigDecimal.valueOf(inferredPricedAddedQuantity), 4, RoundingMode.HALF_UP)
+            BigDecimal averageInferredAddPrice = inferredPricedAddedQuantity.compareTo(BigDecimal.ZERO) > 0
+                    ? inferredAddedNotional.divide(inferredPricedAddedQuantity, 4, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
             return new InferredAccountTradeCountsResponse(
                     accountId,
@@ -913,7 +926,7 @@ public class TradeService {
             movement = movement.negate();
         }
         BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
-        BigDecimal gross = movement.multiply(BigDecimal.valueOf(trade.getQuantity())).multiply(multiplier);
+        BigDecimal gross = movement.multiply(trade.getQuantity()).multiply(multiplier);
         BigDecimal fees = trade.getFees() != null ? trade.getFees() : BigDecimal.ZERO;
         BigDecimal marginFee = calculateMarginFee(trade);
         return gross.subtract(fees).subtract(marginFee).setScale(2, RoundingMode.HALF_UP);
@@ -984,7 +997,7 @@ public class TradeService {
         }
         BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
         BigDecimal notional = trade.getEntryPrice()
-                .multiply(BigDecimal.valueOf(trade.getQuantity()))
+                .multiply(trade.getQuantity())
                 .multiply(multiplier)
                 .abs();
         if (trade.getCurrency() == Currency.CAD) {
@@ -999,7 +1012,7 @@ public class TradeService {
         }
         BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
         return trade.getEntryPrice()
-                .multiply(BigDecimal.valueOf(trade.getQuantity()))
+                .multiply(trade.getQuantity())
                 .multiply(multiplier)
                 .abs();
     }

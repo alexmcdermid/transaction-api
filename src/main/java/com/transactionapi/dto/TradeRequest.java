@@ -18,7 +18,7 @@ public record TradeRequest(
         @NotNull AssetType assetType,
         @NotNull Currency currency,
         @NotNull TradeDirection direction,
-        @NotNull @Positive Integer quantity,
+        @NotNull @Positive BigDecimal quantity,
         @NotNull @DecimalMin("0.00") BigDecimal entryPrice,
         @NotNull @DecimalMin("0.00") BigDecimal exitPrice,
         @DecimalMin("0.00") BigDecimal fees,
@@ -37,6 +37,117 @@ public record TradeRequest(
             Currency currency,
             TradeDirection direction,
             Integer quantity,
+            BigDecimal entryPrice,
+            BigDecimal exitPrice,
+            BigDecimal fees,
+            BigDecimal marginRate,
+            UUID accountId,
+            OptionType optionType,
+            BigDecimal strikePrice,
+            LocalDate expiryDate,
+            LocalDate openedAt,
+            LocalDate closedAt,
+            String notes
+    ) {
+        this(
+                symbol,
+                assetType,
+                currency,
+                direction,
+                toBigDecimal(quantity),
+                entryPrice,
+                exitPrice,
+                fees,
+                marginRate,
+                accountId,
+                optionType,
+                strikePrice,
+                expiryDate,
+                openedAt,
+                closedAt,
+                notes
+        );
+    }
+
+    public TradeRequest(
+            String symbol,
+            AssetType assetType,
+            Currency currency,
+            TradeDirection direction,
+            Integer quantity,
+            BigDecimal entryPrice,
+            BigDecimal exitPrice,
+            BigDecimal fees,
+            UUID accountId,
+            OptionType optionType,
+            BigDecimal strikePrice,
+            LocalDate expiryDate,
+            LocalDate openedAt,
+            LocalDate closedAt,
+            String notes
+    ) {
+        this(
+                symbol,
+                assetType,
+                currency,
+                direction,
+                toBigDecimal(quantity),
+                entryPrice,
+                exitPrice,
+                fees,
+                null,
+                accountId,
+                optionType,
+                strikePrice,
+                expiryDate,
+                openedAt,
+                closedAt,
+                notes
+        );
+    }
+
+    public TradeRequest(
+            String symbol,
+            AssetType assetType,
+            Currency currency,
+            TradeDirection direction,
+            Integer quantity,
+            BigDecimal entryPrice,
+            BigDecimal exitPrice,
+            BigDecimal fees,
+            OptionType optionType,
+            BigDecimal strikePrice,
+            LocalDate expiryDate,
+            LocalDate openedAt,
+            LocalDate closedAt,
+            String notes
+    ) {
+        this(
+                symbol,
+                assetType,
+                currency,
+                direction,
+                toBigDecimal(quantity),
+                entryPrice,
+                exitPrice,
+                fees,
+                null,
+                null,
+                optionType,
+                strikePrice,
+                expiryDate,
+                openedAt,
+                closedAt,
+                notes
+        );
+    }
+
+    public TradeRequest(
+            String symbol,
+            AssetType assetType,
+            Currency currency,
+            TradeDirection direction,
+            BigDecimal quantity,
             BigDecimal entryPrice,
             BigDecimal exitPrice,
             BigDecimal fees,
@@ -73,7 +184,7 @@ public record TradeRequest(
             AssetType assetType,
             Currency currency,
             TradeDirection direction,
-            Integer quantity,
+            BigDecimal quantity,
             BigDecimal entryPrice,
             BigDecimal exitPrice,
             BigDecimal fees,
@@ -102,5 +213,9 @@ public record TradeRequest(
                 closedAt,
                 notes
         );
+    }
+
+    private static BigDecimal toBigDecimal(Integer value) {
+        return value == null ? null : BigDecimal.valueOf(value);
     }
 }

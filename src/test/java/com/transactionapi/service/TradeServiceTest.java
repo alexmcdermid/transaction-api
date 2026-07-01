@@ -146,7 +146,7 @@ class TradeServiceTest {
                 .orElseThrow();
         assertThat(createHistory.getUserId()).isEqualTo(USER_ID);
         assertThat(createHistory.getSymbol()).isEqualTo("AAPL");
-        assertThat(createHistory.getQuantity()).isEqualTo(10);
+        assertThat(createHistory.getQuantity()).isEqualByComparingTo("10");
         assertThat(createHistory.getRealizedPnl()).isEqualByComparingTo("20.00");
         assertThat(createHistory.getTradeCreatedAt()).isNotNull();
         assertThat(createHistory.getTradeUpdatedAt()).isNotNull();
@@ -157,7 +157,7 @@ class TradeServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(editHistory.getSymbol()).isEqualTo("MSFT");
-        assertThat(editHistory.getQuantity()).isEqualTo(5);
+        assertThat(editHistory.getQuantity()).isEqualByComparingTo("5");
         assertThat(editHistory.getRealizedPnl()).isEqualByComparingTo("14.00");
         assertThat(editHistory.getNotes()).isEqualTo("updated");
 
@@ -166,7 +166,7 @@ class TradeServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(deleteHistory.getSymbol()).isEqualTo("MSFT");
-        assertThat(deleteHistory.getQuantity()).isEqualTo(5);
+        assertThat(deleteHistory.getQuantity()).isEqualByComparingTo("5");
         assertThat(deleteHistory.getNotes()).isEqualTo("updated");
         assertThat(tradeRepository.findById(created.id())).isEmpty();
     }
@@ -1844,7 +1844,7 @@ class TradeServiceTest {
         assertThat(accountCounts.inferredAddCount()).isEqualTo(1);
         assertThat(accountCounts.monthInferredAddCount()).isEqualTo(1);
         assertThat(accountCounts.dayInferredAddCount()).isEqualTo(1);
-        assertThat(accountCounts.inferredAddedQuantity()).isEqualTo(1000);
+        assertThat(accountCounts.inferredAddedQuantity()).isEqualByComparingTo("1000");
         assertThat(accountCounts.averageInferredAddPrice()).isEqualByComparingTo("4.0000");
         assertThat(accountCounts.year()).isEqualTo(2024);
         assertThat(accountCounts.month()).isEqualTo("2024-03");

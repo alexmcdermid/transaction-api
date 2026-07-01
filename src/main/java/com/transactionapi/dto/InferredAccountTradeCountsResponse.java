@@ -16,7 +16,7 @@ public record InferredAccountTradeCountsResponse(
         int inferredAddCount,
         int monthInferredAddCount,
         int dayInferredAddCount,
-        int inferredAddedQuantity,
+        BigDecimal inferredAddedQuantity,
         BigDecimal averageInferredAddPrice,
         Integer year,
         String month,

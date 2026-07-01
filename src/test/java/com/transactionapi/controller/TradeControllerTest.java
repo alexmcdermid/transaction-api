@@ -187,6 +187,37 @@ class TradeControllerTest {
     }
 
     @Test
+    void createsFractionalCryptoLikeTrade() throws Exception {
+        TradeRequest btcTrade = new TradeRequest(
+                "BTC",
+                AssetType.STOCK,
+                Currency.USD,
+                TradeDirection.LONG,
+                new BigDecimal("0.1257"),
+                new BigDecimal("60000.00"),
+                new BigDecimal("62000.00"),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 6, 24),
+                LocalDate.of(2026, 6, 24),
+                "fractional btc"
+        );
+
+        mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", "fractional-user")
+                                .content(objectMapper.writeValueAsString(btcTrade))
+                )
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.symbol").value("BTC"))
+                .andExpect(jsonPath("$.quantity").value(0.1257))
+                .andExpect(jsonPath("$.realizedPnl").value(251.4));
+    }
+
+    @Test
     void rejectsInvalidSortByValue() throws Exception {
         mockMvc.perform(
                         get(ApiPaths.TRADES + "/paged")
