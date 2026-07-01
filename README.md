@@ -11,7 +11,7 @@ This API provides endpoints to:
 - **Multi-currency support** - Handle USD and CAD trades with automatic FX conversion
 - **Share trades** - Generate shareable links for individual trades
 
-Trades are stored per-user in PostgreSQL. Authentication is handled by validating a Google credential once, then issuing a first-party session cookie. The API supports both long and short positions for stocks and options (calls/puts).
+Trades are stored per-user in PostgreSQL. Authentication validates a Google credential once, then uses backend-managed session cookies for browser requests. The API supports both long and short positions for stocks and options (calls/puts).
 
 ## Key Features
 
@@ -25,12 +25,16 @@ Trades are stored per-user in PostgreSQL. Authentication is handled by validatin
 
 - Spring Boot 3 / Java 21
 - PostgreSQL with Flyway migrations
-- Google OAuth validation with first-party session cookies
+- Google credential validation with backend-managed session cookies
 - Deployed on AWS App Runner
 
 ## Development
 
 See [DEV.md](DEV.md) for setup instructions, API documentation, and deployment details.
+
+## Frontend App
+
+This API supports the companion React frontend: [alexmcdermid/tradingView](https://github.com/alexmcdermid/tradingView).
 
 For the target private App Runner deployment, see [Private App Runner + Neon Deployment](docs/private-app-runner-neon.md).
 
