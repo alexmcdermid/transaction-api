@@ -6,12 +6,14 @@ import com.transactionapi.dto.CsrfTokenResponse;
 import com.transactionapi.dto.UserProfileResponse;
 import com.transactionapi.model.User;
 import com.transactionapi.security.AuthenticatedUserPrincipal;
+import com.transactionapi.security.AbsoluteSessionTimeoutFilter;
 import com.transactionapi.security.UserIdResolver;
 import com.transactionapi.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -98,6 +100,7 @@ public class AuthController {
         if (!session.isNew()) {
             request.changeSessionId();
         }
+        session.setAttribute(AbsoluteSessionTimeoutFilter.ISSUED_AT_ATTRIBUTE, Instant.now());
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(sessionAuthentication);

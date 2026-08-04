@@ -62,10 +62,13 @@ Session cookies are configured as:
 - `HttpOnly`
 - `Secure` by default (`APP_SESSION_COOKIE_SECURE=false` only for local HTTP)
 - `SameSite=Lax` by default (`APP_SESSION_COOKIE_SAME_SITE=lax`)
-- timeout from `APP_SESSION_TIMEOUT` (default `PT2H`)
-- browser persistence from `APP_SESSION_COOKIE_MAX_AGE` (default `PT2H`)
+- idle timeout from `APP_SESSION_TIMEOUT` (default `P1D`, 24 hours)
+- server-enforced maximum from `APP_SESSION_ABSOLUTE_TIMEOUT` (default `P7D`, seven days)
+- browser persistence from `APP_SESSION_COOKIE_MAX_AGE` (default `P7D`, seven days)
 
 Keep frontend and backend deployments same-site for browser session auth. `https://www.tradelog.ca` or `https://dev.tradelog.ca` talking to an API on another `*.tradelog.ca` hostname is same-site and works with `SameSite=Lax`. If the API is deployed on a different registrable domain, set `APP_SESSION_COOKIE_SAME_SITE=none`, keep `APP_SESSION_COOKIE_SECURE=true`, and re-check the CORS/CSRF deployment path deliberately.
+
+Sessions are held in the running API instance, so an App Runner restart, deployment, or scale-out can still require a fresh sign-in. Session activity resets only the 24-hour idle timeout; the server invalidates the session after seven days even if it remains active. The frontend already requests the current profile on load and uses Google One Tap auto-select when no session is present; it deliberately does not retry a failed write automatically.
 
 CSRF protection is enabled for unsafe cookie-session requests. Browser clients should fetch `GET /api/v1/auth/csrf` and send the returned header on `POST`, `PUT`, `PATCH`, and `DELETE` requests.
 
@@ -122,8 +125,9 @@ Optional:
 - `APP_SECURITY_JWT_DYNAMO_MAX_STALE=PT72H`
 - `APP_RATE_LIMIT_TRUST_FORWARDED_HEADERS=false`
 - `APP_RATE_LIMIT_MAX_BUCKETS=10000`
-- `APP_SESSION_TIMEOUT=PT2H`
-- `APP_SESSION_COOKIE_MAX_AGE=PT2H`
+- `APP_SESSION_TIMEOUT=P1D`
+- `APP_SESSION_ABSOLUTE_TIMEOUT=P7D`
+- `APP_SESSION_COOKIE_MAX_AGE=P7D`
 - `APP_SESSION_COOKIE_SECURE=true`
 - `APP_SESSION_COOKIE_SAME_SITE=lax`
 
