@@ -14,7 +14,7 @@ class SecurityConfigTest {
 
     @Test
     void csrfCookieUsesSessionCookieSecureSetting() {
-        SecurityConfig config = new SecurityConfig(null, null, null, null, null);
+        SecurityConfig config = new SecurityConfig(null, null, null, null, null, null);
         ReflectionTestUtils.setField(config, "sessionCookieSecure", true);
 
         CookieCsrfTokenRepository repository = ReflectionTestUtils.invokeMethod(

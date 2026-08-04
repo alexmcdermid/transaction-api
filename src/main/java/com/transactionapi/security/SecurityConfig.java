@@ -33,6 +33,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final HeaderUserAuthenticationFilter headerUserAuthenticationFilter;
+    private final AbsoluteSessionTimeoutFilter absoluteSessionTimeoutFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final LegalAgreementFilter legalAgreementFilter;
     private final Environment environment;
@@ -56,12 +57,14 @@ public class SecurityConfig {
 
     public SecurityConfig(
             HeaderUserAuthenticationFilter headerUserAuthenticationFilter,
+            AbsoluteSessionTimeoutFilter absoluteSessionTimeoutFilter,
             RateLimitingFilter rateLimitingFilter,
             LegalAgreementFilter legalAgreementFilter,
             ObjectProvider<JwtDecoder> jwtDecoderProvider,
             Environment environment
     ) {
         this.headerUserAuthenticationFilter = headerUserAuthenticationFilter;
+        this.absoluteSessionTimeoutFilter = absoluteSessionTimeoutFilter;
         this.rateLimitingFilter = rateLimitingFilter;
         this.legalAgreementFilter = legalAgreementFilter;
         this.jwtDecoderProvider = jwtDecoderProvider;
@@ -93,6 +96,7 @@ public class SecurityConfig {
             http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)));
         }
         http.addFilterBefore(headerUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(absoluteSessionTimeoutFilter, HeaderUserAuthenticationFilter.class);
         http.addFilterAfter(rateLimitingFilter, HeaderUserAuthenticationFilter.class);
         http.addFilterAfter(legalAgreementFilter, RateLimitingFilter.class);
         return http.build();

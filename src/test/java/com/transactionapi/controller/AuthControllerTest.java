@@ -14,7 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
+import com.transactionapi.security.AbsoluteSessionTimeoutFilter;
 import jakarta.servlet.http.Cookie;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -77,6 +80,7 @@ class AuthControllerTest {
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertTrue(session.getAttribute(AbsoluteSessionTimeoutFilter.ISSUED_AT_ATTRIBUTE) instanceof Instant);
 
         mockMvc.perform(get(ApiPaths.USER_ME).session(session))
                 .andExpect(status().isOk())
@@ -86,11 +90,37 @@ class AuthControllerTest {
     }
 
     @Test
-    void sessionCookieDefaultsAreSecureAndPersistent() {
+    void sessionDefaultsUseOneDayIdleAndSevenDayAbsoluteTimeouts() {
         assertEquals("true", environment.getProperty("server.servlet.session.cookie.http-only"));
-        assertEquals("PT2H", environment.getProperty("server.servlet.session.cookie.max-age"));
+        assertEquals("P1D", environment.getProperty("server.servlet.session.timeout"));
+        assertEquals("P7D", environment.getProperty("server.servlet.session.cookie.max-age"));
+        assertEquals("P7D", environment.getProperty("app.security.session.absolute-timeout"));
         assertEquals("true", environment.getProperty("server.servlet.session.cookie.secure"));
         assertEquals("lax", environment.getProperty("server.servlet.session.cookie.same-site"));
+    }
+
+    @Test
+    void absoluteSessionTimeoutInvalidatesAnOtherwiseActiveSession() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .subject("google-sub-expired")
+                .claim("email", "expired@example.com")
+                .claim("name", "Expired User")
+                .build();
+        when(jwtDecoder.decode("google-id-token")).thenReturn(jwt);
+
+        MvcResult loginResult = loginWithCsrf("google-id-token")
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        session.setAttribute(
+                AbsoluteSessionTimeoutFilter.ISSUED_AT_ATTRIBUTE,
+                Instant.now().minus(Duration.ofDays(8))
+        );
+
+        mockMvc.perform(get(ApiPaths.USER_ME).session(session))
+                .andExpect(status().isUnauthorized());
+        assertTrue(session.isInvalid());
     }
 
     @Test
