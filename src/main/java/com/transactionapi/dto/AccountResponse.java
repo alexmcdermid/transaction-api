@@ -8,6 +8,7 @@ import java.util.UUID;
 public record AccountResponse(
         UUID id,
         String name,
+        boolean taxFree,
         BigDecimal defaultStockFees,
         BigDecimal defaultOptionFees,
         BigDecimal defaultMarginRateUsd,
@@ -29,6 +30,7 @@ public record AccountResponse(
         return new AccountResponse(
                 account.getId(),
                 account.getName(),
+                account.isTaxFree(),
                 defaultStockFees,
                 defaultOptionFees,
                 defaultMarginRateUsd,

@@ -1342,6 +1342,78 @@ class TradeServiceTest {
     }
 
     @Test
+    void taxablePnlExcludesTaxFreeAccountsButIncludesUnassignedTrades() {
+        Account taxableAccount = createAccount("Interactive Brokers");
+        Account taxFreeAccount = createAccount("Questrade TFSA");
+        taxFreeAccount.setTaxFree(true);
+        accountRepository.save(taxFreeAccount);
+
+        tradeService.createTrade(
+                new TradeRequest(
+                        "TAXABLE",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        taxableAccount.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 10),
+                        LocalDate.of(2024, 1, 10),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "SHELTERED",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("40.00"),
+                        BigDecimal.ZERO,
+                        taxFreeAccount.getId(),
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 11),
+                        LocalDate.of(2024, 1, 11),
+                        null
+                ),
+                USER_ID
+        );
+        tradeService.createTrade(
+                new TradeRequest(
+                        "UNASSIGNED",
+                        AssetType.STOCK,
+                        Currency.USD,
+                        TradeDirection.LONG,
+                        10,
+                        new BigDecimal("10.00"),
+                        new BigDecimal("15.00"),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2024, 1, 12),
+                        LocalDate.of(2024, 1, 12),
+                        null
+                ),
+                USER_ID
+        );
+
+        assertThat(tradeService.getTaxablePnl(USER_ID, 2024).totalPnl())
+                .isEqualByComparingTo("150.00");
+    }
+
+    @Test
     void scopedAggregateStatsDefaultsToMostRecentTradeYear() {
         tradeService.createTrade(
                 new TradeRequest(
