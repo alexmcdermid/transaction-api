@@ -29,6 +29,9 @@ public class Account {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(name = "tax_free", nullable = false)
+    private boolean taxFree;
+
     @Column(name = "default_stock_fees", precision = 18, scale = 2, nullable = false)
     private BigDecimal defaultStockFees = BigDecimal.ZERO;
 
@@ -78,6 +81,14 @@ public class Account {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public boolean isTaxFree() {
+        return taxFree;
+    }
+
+    public void setTaxFree(boolean taxFree) {
+        this.taxFree = taxFree;
     }
 
     public BigDecimal getDefaultStockFees() {

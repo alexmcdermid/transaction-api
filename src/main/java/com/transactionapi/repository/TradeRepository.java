@@ -96,6 +96,27 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
     );
 
     @Query(value = """
+        select sum(
+            case
+                when t.currency = 'CAD' then t.realized_pnl * CAST(:cadToUsd AS numeric)
+                else t.realized_pnl
+            end
+        )
+        from trades t
+        left join accounts a on a.id = t.account_id
+        where t.user_id = :userId
+          and t.closed_at >= :startDate
+          and t.closed_at < :endDate
+          and (a.id is null or a.tax_free = false)
+        """, nativeQuery = true)
+    BigDecimal sumTaxablePnlByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("cadToUsd") BigDecimal cadToUsdRate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
         select
             closed_at as period,
             sum(

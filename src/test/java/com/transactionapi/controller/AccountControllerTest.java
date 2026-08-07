@@ -45,6 +45,7 @@ class AccountControllerTest {
                 )
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Wealthsimple"))
+                .andExpect(jsonPath("$.taxFree").value(false))
                 .andExpect(jsonPath("$.defaultStockFees").value(0))
                 .andExpect(jsonPath("$.defaultOptionFees").value(1.25))
                 .andExpect(jsonPath("$.defaultMarginRateUsd").value(6.25))
@@ -112,6 +113,7 @@ class AccountControllerTest {
                                 .content("""
                                         {
                                           "name": "IBKR Pro",
+                                          "taxFree": true,
                                           "defaultStockFees": 0.50,
                                           "defaultOptionFees": 0.35,
                                           "defaultMarginRateUsd": 4.83,
@@ -122,6 +124,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(accountId))
                 .andExpect(jsonPath("$.name").value("IBKR Pro"))
+                .andExpect(jsonPath("$.taxFree").value(true))
                 .andExpect(jsonPath("$.defaultStockFees").value(0.50))
                 .andExpect(jsonPath("$.defaultOptionFees").value(0.35))
                 .andExpect(jsonPath("$.defaultMarginRateUsd").value(4.83))
@@ -134,6 +137,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].name").value("IBKR Pro"))
+                .andExpect(jsonPath("$[0].taxFree").value(true))
                 .andExpect(jsonPath("$[0].defaultStockFees").value(0.50));
     }
 

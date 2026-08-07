@@ -12,6 +12,7 @@ import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PnlBucketResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.TaxablePnlResponse;
 import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -458,6 +459,28 @@ public class TradeService {
                 scopedYear,
                 scopedMonth != null ? scopedMonth.toString() : null,
                 day != null ? day.toString() : null
+        );
+    }
+
+    public TaxablePnlResponse getTaxablePnl(String userId, Integer year) {
+        int scopedYear = resolveScopedYear(userId, year, null, null);
+        LocalDate startDate = LocalDate.of(scopedYear, 1, 1);
+        LocalDate endDate = startDate.plusYears(1);
+        BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
+        BigDecimal totalPnl = tradeRepository.sumTaxablePnlByUserIdAndDateRange(
+                userId,
+                cadToUsdRate,
+                startDate,
+                endDate
+        );
+        if (totalPnl == null) {
+            totalPnl = BigDecimal.ZERO;
+        }
+        return new TaxablePnlResponse(
+                totalPnl.setScale(2, RoundingMode.HALF_UP),
+                cadToUsdRate,
+                exchangeRateService.lastUpdatedOn(),
+                scopedYear
         );
     }
 

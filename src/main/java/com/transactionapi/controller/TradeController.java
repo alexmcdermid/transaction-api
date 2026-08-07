@@ -8,6 +8,7 @@ import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.InferredAccountTradeCountsResponse;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
+import com.transactionapi.dto.TaxablePnlResponse;
 import com.transactionapi.dto.TradeCountStatsResponse;
 import com.transactionapi.dto.TradeHistoryResponse;
 import com.transactionapi.dto.TradeRequest;
@@ -151,6 +152,16 @@ public class TradeController {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.getScopedAggregateStats(userId, year, parseMonth(month), parseDate(day));
+    }
+
+    @GetMapping("/stats/taxable-pnl")
+    public TaxablePnlResponse taxablePnl(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.getTaxablePnl(userId, year);
     }
 
     @GetMapping("/stats/accounts")

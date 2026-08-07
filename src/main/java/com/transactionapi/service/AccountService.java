@@ -29,6 +29,7 @@ public class AccountService {
         Account account = new Account();
         account.setUserId(userId);
         account.setName(request.name().trim());
+        account.setTaxFree(Boolean.TRUE.equals(request.taxFree()));
         account.setDefaultStockFees(
                 request.defaultStockFees() != null ? request.defaultStockFees() : BigDecimal.ZERO
         );
@@ -48,6 +49,9 @@ public class AccountService {
         Account account = accountRepository.findByIdAndUserId(accountId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         account.setName(request.name().trim());
+        if (request.taxFree() != null) {
+            account.setTaxFree(request.taxFree());
+        }
         account.setDefaultStockFees(
                 request.defaultStockFees() != null ? request.defaultStockFees() : BigDecimal.ZERO
         );

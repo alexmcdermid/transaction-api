@@ -508,6 +508,18 @@ class TradeControllerTest {
     }
 
     @Test
+    void taxablePnlStatsAcceptsYearParameter() throws Exception {
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/stats/taxable-pnl")
+                                .header("X-User-Id", "taxable-pnl-user")
+                                .param("year", "2024")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2024))
+                .andExpect(jsonPath("$.totalPnl").value(0));
+    }
+
+    @Test
     void userCannotAccessAnotherUsersTrades() throws Exception {
         String userA = "user-a";
         String userB = "user-b";

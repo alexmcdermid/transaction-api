@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 
 public record AccountRequest(
         @NotBlank @Size(max = 120) String name,
+        Boolean taxFree,
         @DecimalMin("0.00") BigDecimal defaultStockFees,
         @DecimalMin("0.00") BigDecimal defaultOptionFees,
         @DecimalMin("0.00") BigDecimal defaultMarginRateUsd,
