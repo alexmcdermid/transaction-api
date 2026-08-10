@@ -93,6 +93,9 @@ public class LegalAgreementFilter extends OncePerRequestFilter {
         if (path.equals(ApiPaths.HEALTH) || path.startsWith(ApiPaths.AUTH + "/")) {
             return true;
         }
+        if (HttpMethod.POST.matches(method) && path.equals(ApiPaths.BILLING_WEBHOOK)) {
+            return true;
+        }
         if (HttpMethod.GET.matches(method) && path.equals(ApiPaths.USER_ME)) {
             return true;
         }

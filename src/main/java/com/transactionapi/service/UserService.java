@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +57,81 @@ public class UserService {
 
     public boolean hasAcceptedLegalAgreement(User user) {
         return user.getTermsAcceptedAt() != null && user.getPrivacyPolicyAcceptedAt() != null;
+    }
+
+    public Optional<User> findByStripeCustomerId(String stripeCustomerId) {
+        if (stripeCustomerId == null || stripeCustomerId.isBlank()) {
+            return Optional.empty();
+        }
+        return userRepository.findByStripeCustomerId(stripeCustomerId);
+    }
+
+    public User updateStripeCustomerId(String authId, String email, String stripeCustomerId) {
+        User user = getOrCreateUser(authId, email);
+        if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+            user.setStripeCustomerId(stripeCustomerId);
+        }
+        return userRepository.save(user);
+    }
+
+    public Optional<User> updateStripeSubscriptionFromCheckout(
+            String authId,
+            String stripeCustomerId,
+            String stripeSubscriptionId
+    ) {
+        if (authId == null || authId.isBlank()) {
+            return updateStripeSubscriptionStatus(stripeCustomerId, stripeSubscriptionId, "checkout_completed");
+        }
+        User user = getOrCreateUser(authId, null);
+        applyStripeSubscription(user, stripeCustomerId, stripeSubscriptionId, "checkout_completed", true);
+        return Optional.of(userRepository.save(user));
+    }
+
+    public Optional<User> updateStripeSubscriptionStatus(
+            String stripeCustomerId,
+            String stripeSubscriptionId,
+            String status
+    ) {
+        Optional<User> user = Optional.empty();
+        if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+            user = userRepository.findByStripeCustomerId(stripeCustomerId);
+        }
+        if (user.isEmpty() && stripeSubscriptionId != null && !stripeSubscriptionId.isBlank()) {
+            user = userRepository.findByStripeSubscriptionId(stripeSubscriptionId);
+        }
+        return user.map(existing -> {
+            applyStripeSubscription(
+                    existing,
+                    stripeCustomerId,
+                    stripeSubscriptionId,
+                    status,
+                    isPremiumSubscriptionStatus(status)
+            );
+            return userRepository.save(existing);
+        });
+    }
+
+    private void applyStripeSubscription(
+            User user,
+            String stripeCustomerId,
+            String stripeSubscriptionId,
+            String status,
+            boolean premium
+    ) {
+        if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+            user.setStripeCustomerId(stripeCustomerId);
+        }
+        if (stripeSubscriptionId != null && !stripeSubscriptionId.isBlank()) {
+            user.setStripeSubscriptionId(stripeSubscriptionId);
+        }
+        if (status != null && !status.isBlank()) {
+            user.setStripeSubscriptionStatus(status);
+        }
+        user.setPremium(premium);
+    }
+
+    private boolean isPremiumSubscriptionStatus(String status) {
+        return "active".equals(status) || "trialing".equals(status) || "checkout_completed".equals(status);
     }
 
     public User updatePreferences(
