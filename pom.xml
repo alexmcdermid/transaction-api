@@ -10,12 +10,53 @@
     <description>Spring Boot service for recording financial transactions</description>
     <properties>
         <java.version>21</java.version>
-        <spring-boot.version>3.5.15</spring-boot.version>
+        <spring-boot.version>3.5.16</spring-boot.version>
         <aws.sdk.version>2.41.17</aws.sdk.version>
+        <jackson.version>2.21.7</jackson.version>
+        <log4j2.version>2.25.5</log4j2.version>
+        <netty.version>4.1.139.Final</netty.version>
+        <tomcat.version>10.1.61</tomcat.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Security patch overrides; must precede spring-boot-dependencies so they take precedence. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-bom</artifactId>
+                <version>${log4j2.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-core</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-el</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-websocket</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -59,7 +100,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.7</version>
+            <version>42.7.14</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
