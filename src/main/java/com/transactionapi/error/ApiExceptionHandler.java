@@ -1,8 +1,5 @@
 package com.transactionapi.error;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -21,6 +18,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -113,13 +113,13 @@ public class ApiExceptionHandler {
         return "Request body is invalid or malformed";
     }
 
-    private String pathFieldName(JsonMappingException exception) {
-        List<JsonMappingException.Reference> path = exception.getPath();
+    private String pathFieldName(JacksonException exception) {
+        List<JacksonException.Reference> path = exception.getPath();
         if (path == null || path.isEmpty()) {
             return null;
         }
         for (int i = path.size() - 1; i >= 0; i--) {
-            String fieldName = path.get(i).getFieldName();
+            String fieldName = path.get(i).getPropertyName();
             if (StringUtils.hasText(fieldName)) {
                 return fieldName;
             }

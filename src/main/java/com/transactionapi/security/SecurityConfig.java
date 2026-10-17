@@ -107,7 +107,7 @@ public class SecurityConfig {
         repository.setCookiePath("/");
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
-        repository.setSecure(sessionCookieSecure);
+        repository.setCookieCustomizer(cookie -> cookie.secure(sessionCookieSecure));
         return repository;
     }
 
