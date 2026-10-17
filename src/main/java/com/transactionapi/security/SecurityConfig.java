@@ -84,6 +84,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", ApiPaths.HEALTH, ApiPaths.AUTH_CSRF, ApiPaths.AUTH_LOGIN, ApiPaths.AUTH_LOGOUT).permitAll()
                 .requestMatchers(HttpMethod.GET, ApiPaths.SHARES + "/*").permitAll()
+                // Exact path only: /users/me/* sub-routes stay authenticated.
+                .requestMatchers(HttpMethod.GET, ApiPaths.USER_ME).permitAll()
                 .anyRequest().authenticated()
         );
         http.exceptionHandling(ex -> ex
