@@ -2,12 +2,17 @@ package com.transactionapi.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -118,8 +123,60 @@ class AuthControllerTest {
                 Instant.now().minus(Duration.ofDays(8))
         );
 
-        mockMvc.perform(get(ApiPaths.USER_ME).session(session))
+        mockMvc.perform(get(ApiPaths.USER_PREFERENCES).session(session))
                 .andExpect(status().isUnauthorized());
+        assertTrue(session.isInvalid());
+    }
+
+    @Test
+    void userProfileReturnsNoContentWithoutASession() throws Exception {
+        MvcResult result = mockMvc.perform(get(ApiPaths.USER_ME))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
+                .andExpect(header().string("Cache-Control", containsString("no-store")))
+                .andReturn();
+        assertNull(result.getRequest().getSession(false));
+        assertNull(result.getResponse().getCookie("JSESSIONID"));
+    }
+
+    @Test
+    void userProfileSubRoutesStillRequireASession() throws Exception {
+        mockMvc.perform(get(ApiPaths.USER_PREFERENCES))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(
+                        put(ApiPaths.USER_PREFERENCES)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}")
+                )
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get(ApiPaths.USER_ACCOUNTS))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post(ApiPaths.USER_LEGAL_AGREEMENT).with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void userProfileReturnsNoContentAfterAbsoluteTimeout() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .subject("google-sub-profile-expired")
+                .claim("email", "profile-expired@example.com")
+                .claim("name", "Profile Expired User")
+                .build();
+        when(jwtDecoder.decode("google-id-token")).thenReturn(jwt);
+
+        MvcResult loginResult = loginWithCsrf("google-id-token")
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        session.setAttribute(
+                AbsoluteSessionTimeoutFilter.ISSUED_AT_ATTRIBUTE,
+                Instant.now().minus(Duration.ofDays(8))
+        );
+
+        mockMvc.perform(get(ApiPaths.USER_ME).session(session))
+                .andExpect(status().isNoContent());
         assertTrue(session.isInvalid());
     }
 
