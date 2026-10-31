@@ -25,7 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 @ExtendWith(MockitoExtension.class)
 class TaxYearPassServiceCheckoutTest {
 
-    private static final BillingSettings CHECKOUT_DISABLED = new BillingSettings("", "", "", "");
+    private static final BillingSettings CHECKOUT_DISABLED = new BillingSettings("", "", "", "", "");
 
     @Mock
     private TaxYearPassRepository taxYearPassRepository;
@@ -55,7 +55,13 @@ class TaxYearPassServiceCheckoutTest {
     void checkoutKeepsTheQueryStringAlreadyOnThePaymentLink() {
         TaxYearPassService service = new TaxYearPassService(
                 taxYearPassRepository,
-                new BillingSettings("whsec_test_secret", "https://buy.stripe.com/test_link?locale=fr-CA", "", "")
+                new BillingSettings(
+                        "whsec_test_secret",
+                        "https://buy.stripe.com/test_link?locale=fr-CA",
+                        "plink_test_link",
+                        "",
+                        ""
+                )
         );
         User user = userWithId();
         TaxYearPass pendingPass = passWithId(user, TaxYearPassStatus.PENDING);

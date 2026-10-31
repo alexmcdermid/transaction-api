@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = {
         "app.billing.stripe.webhook-secret=whsec_test_secret",
         "app.billing.tax-year-pass.payment-link-url=https://buy.stripe.com/test_link",
+        "app.billing.tax-year-pass.payment-link-id=plink_test_link",
         "app.billing.tax-year-pass.price-cents=3900",
         "app.billing.tax-year-pass.price-currency=CAD"
 })

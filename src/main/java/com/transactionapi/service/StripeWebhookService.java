@@ -26,7 +26,9 @@ import org.springframework.web.server.ResponseStatusException;
  * Verifies and applies Stripe webhook events for tax year passes. Signature verification is a local
  * HMAC check; this service never calls the Stripe API.
  *
- * <p>Logs carry the event id, event type, pass id and outcome only, never emails or payloads.
+ * <p>Only checkout sessions in payment mode from the configured tax year pass Payment Link can change a
+ * pass. Logs carry Stripe and pass ids, the event type, the session mode and the outcome only, never
+ * emails or payloads.
  */
 @Service
 public class StripeWebhookService {
@@ -37,6 +39,8 @@ public class StripeWebhookService {
     private static final String CHECKOUT_SESSION_ASYNC_PAYMENT_SUCCEEDED = "checkout.session.async_payment_succeeded";
     private static final String CHECKOUT_SESSION_ASYNC_PAYMENT_FAILED = "checkout.session.async_payment_failed";
     private static final String CHARGE_REFUNDED = "charge.refunded";
+    /** A one-time payment; subscription and setup sessions never pay for a pass. */
+    private static final String CHECKOUT_MODE_PAYMENT = "payment";
 
     private final BillingSettings billingSettings;
     private final TaxYearPassService taxYearPassService;
@@ -79,6 +83,19 @@ public class StripeWebhookService {
 
     private void handleCheckoutSessionEvent(Event event) {
         Session session = dataObject(event, Session.class);
+        // The pass id in client_reference_id is visible in the buyer's checkout URL, so anyone can append it to
+        // another Payment Link in this Stripe account, such as a cheaper price or a free-trial subscription.
+        if (!isTaxYearPassCheckout(session)) {
+            log.warn(
+                    "Stripe event {} ({}) is for a checkout session from payment link {} in mode {}, not the tax year "
+                            + "pass payment link; acknowledged without changes",
+                    event.getId(),
+                    event.getType(),
+                    session.getPaymentLink(),
+                    session.getMode()
+            );
+            return;
+        }
         Optional<UUID> passId = parsePassId(session.getClientReferenceId());
         if (passId.isEmpty()) {
             log.warn(
@@ -144,6 +161,11 @@ public class StripeWebhookService {
             );
         }
         updates.forEach(update -> logUpdate(event, update));
+    }
+
+    private boolean isTaxYearPassCheckout(Session session) {
+        return CHECKOUT_MODE_PAYMENT.equals(session.getMode())
+                && billingSettings.getPaymentLinkId().equals(session.getPaymentLink());
     }
 
     private static TaxYearPassStatus targetStatus(Event event, Session session) {

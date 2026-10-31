@@ -34,12 +34,14 @@ import org.springframework.test.web.servlet.ResultActions;
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
         "app.billing.stripe.webhook-secret=whsec_test_secret",
-        "app.billing.tax-year-pass.payment-link-url=https://buy.stripe.com/test_link"
+        "app.billing.tax-year-pass.payment-link-url=https://buy.stripe.com/test_link",
+        "app.billing.tax-year-pass.payment-link-id=plink_test_link"
 })
 @ExtendWith(OutputCaptureExtension.class)
 class StripeWebhookControllerTest {
 
     private static final String WEBHOOK_SECRET = "whsec_test_secret";
+    private static final String PAYMENT_LINK_ID = "plink_test_link";
     /** stripe-java 34.1.0's pinned API version. Events from another release need the deserializeUnsafe fallback. */
     private static final String SDK_API_VERSION = "2026-10-28.endive";
     private static final String BUYER_EMAIL = "webhook.buyer@example.com";
@@ -299,6 +301,48 @@ class StripeWebhookControllerTest {
     }
 
     @Test
+    void sessionFromAnotherPaymentLinkDoesNotUnlockThePass(CapturedOutput output) throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        // The buyer appended their own pass id to a cheaper Payment Link in the same Stripe account.
+        CheckoutSession cheaperLink = new CheckoutSession(pass.getId().toString(), uniqueId("cs_test_"), "paid", 100,
+                uniqueId("pi_test_")).withPaymentLink("plink_test_cheaper_link");
+
+        postWebhook(checkoutSessionEvent("checkout.session.completed", cheaperLink)).andExpect(status().isOk());
+
+        assertPassUnchanged(pass);
+        assertThat(output.getAll().lines().filter(line -> line.contains("plink_test_cheaper_link")))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains("WARN", "in mode payment, not the tax year pass payment link; acknowledged without changes")
+                .doesNotContain(pass.getId().toString(), cheaperLink.id(), BUYER_EMAIL);
+    }
+
+    @Test
+    void sessionWithoutAPaymentLinkDoesNotUnlockThePass() throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        CheckoutSession notFromAPaymentLink = CheckoutSession.paid(pass).withPaymentLink(null);
+
+        postWebhook(checkoutSessionEvent("checkout.session.completed", notFromAPaymentLink)).andExpect(status().isOk());
+        postWebhook(checkoutSessionEvent("checkout.session.async_payment_succeeded", notFromAPaymentLink))
+                .andExpect(status().isOk());
+
+        assertPassUnchanged(pass);
+    }
+
+    @Test
+    void subscriptionSessionDoesNotUnlockThePass(CapturedOutput output) throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        // A free-trial subscription completes without a payment. Even on the configured link, only a one-time
+        // payment can pay for a pass.
+        CheckoutSession freeTrial = new CheckoutSession(pass.getId().toString(), uniqueId("cs_test_"),
+                "no_payment_required", 0, null).withMode("subscription");
+
+        postWebhook(checkoutSessionEvent("checkout.session.completed", freeTrial)).andExpect(status().isOk());
+
+        assertPassUnchanged(pass);
+        assertThat(output).contains("from payment link " + PAYMENT_LINK_ID + " in mode subscription");
+    }
+
+    @Test
     void rejectsPayloadsThatAreNotSignedWithTheWebhookSecret() throws Exception {
         TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
         String payload = checkoutSessionEvent("checkout.session.completed", CheckoutSession.paid(pass));
@@ -413,6 +457,15 @@ class StripeWebhookControllerTest {
         return taxYearPassRepository.findById(pass.getId()).orElseThrow();
     }
 
+    private void assertPassUnchanged(TaxYearPass pass) {
+        TaxYearPass unchanged = reload(pass);
+        assertThat(unchanged.getStatus()).isEqualTo(TaxYearPassStatus.PENDING);
+        assertThat(unchanged.getStripeCheckoutSessionId()).isNull();
+        assertThat(unchanged.getStripePaymentIntentId()).isNull();
+        assertThat(unchanged.getAmountTotal()).isNull();
+        assertThat(unchanged.getPaidAt()).isNull();
+    }
+
     private static String checkoutSessionEvent(String eventType, CheckoutSession session) {
         return checkoutSessionEvent(eventType, SDK_API_VERSION, session);
     }
@@ -440,9 +493,9 @@ class StripeWebhookControllerTest {
                       "customer": "cus_test_buyer",
                       "customer_details": {"email": "%s", "name": "Zoë Buyer"},
                       "livemode": false,
-                      "mode": "payment",
+                      "mode": "%s",
                       "payment_intent": %s,
-                      "payment_link": "plink_test_tax_year_pass",
+                      "payment_link": %s,
                       "payment_status": "%s",
                       "status": "complete"
                     }
@@ -458,7 +511,9 @@ class StripeWebhookControllerTest {
                 session.amountTotal(),
                 jsonString(session.clientReferenceId()),
                 BUYER_EMAIL,
+                session.mode(),
                 jsonString(session.paymentIntentId()),
+                jsonString(session.paymentLink()),
                 session.paymentStatus()
         );
     }
@@ -518,8 +573,15 @@ class StripeWebhookControllerTest {
             String id,
             String paymentStatus,
             long amountTotal,
-            String paymentIntentId
+            String paymentIntentId,
+            String mode,
+            String paymentLink
     ) {
+        /** A one-time payment through the tax year pass Payment Link. */
+        CheckoutSession(String clientReferenceId, String id, String paymentStatus, long amountTotal, String paymentIntentId) {
+            this(clientReferenceId, id, paymentStatus, amountTotal, paymentIntentId, "payment", PAYMENT_LINK_ID);
+        }
+
         static CheckoutSession paid(TaxYearPass pass) {
             return new CheckoutSession(pass.getId().toString(), uniqueId("cs_test_"), "paid", 3900, uniqueId("pi_test_"));
         }
@@ -529,7 +591,18 @@ class StripeWebhookControllerTest {
         }
 
         CheckoutSession withPaymentStatus(String newPaymentStatus) {
-            return new CheckoutSession(clientReferenceId, id, newPaymentStatus, amountTotal, paymentIntentId);
+            return new CheckoutSession(clientReferenceId, id, newPaymentStatus, amountTotal, paymentIntentId, mode,
+                    paymentLink);
+        }
+
+        CheckoutSession withPaymentLink(String newPaymentLink) {
+            return new CheckoutSession(clientReferenceId, id, paymentStatus, amountTotal, paymentIntentId, mode,
+                    newPaymentLink);
+        }
+
+        CheckoutSession withMode(String newMode) {
+            return new CheckoutSession(clientReferenceId, id, paymentStatus, amountTotal, paymentIntentId, newMode,
+                    paymentLink);
         }
     }
 }

@@ -172,10 +172,11 @@ A tax year pass is a one-time Stripe purchase that unlocks reports and exports f
 | --- | --- |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`) |
 | `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL` | Payment Link URL (`https://buy.stripe.com/...`) |
+| `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID` | That Payment Link's id (`plink_...`). The webhook ignores checkout sessions from any other link. |
 | `APP_TAX_YEAR_PASS_PRICE_CENTS` | Optional display price in minor units, e.g. `3900` |
 | `APP_TAX_YEAR_PASS_PRICE_CURRENCY` | Optional display currency, e.g. `CAD` |
 
-Set the webhook secret and Payment Link URL together, or leave both blank to disable checkout: `POST .../checkout` and the webhook then return `503`. The app refuses to start on a partial or malformed pair. CI passes them from optional GitHub environment secrets: `DEV_STRIPE_WEBHOOK_SECRET`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_URL`, `DEV_TAX_YEAR_PASS_PRICE_CENTS` and `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with `PROD_` equivalents for prod.
+Set the webhook secret, Payment Link URL and Payment Link id together, or leave all three blank to disable checkout: `POST .../checkout` and the webhook then return `503`. The app refuses to start on a partial or malformed set, so add the Payment Link id secret before deploying to an environment that already has the other two. CI passes them from optional GitHub environment secrets: `DEV_STRIPE_WEBHOOK_SECRET`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_URL`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_ID`, `DEV_TAX_YEAR_PASS_PRICE_CENTS` and `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with `PROD_` equivalents for prod.
 
 Local webhook testing with the Stripe CLI:
 
@@ -183,10 +184,11 @@ Local webhook testing with the Stripe CLI:
 stripe login
 stripe listen --forward-to localhost:8080/api/v1/billing/stripe/webhook
 # Export the printed whsec_... as STRIPE_WEBHOOK_SECRET, set APP_TAX_YEAR_PASS_PAYMENT_LINK_URL
-# to a test-mode Payment Link, then start the backend.
+# and APP_TAX_YEAR_PASS_PAYMENT_LINK_ID to a test-mode Payment Link's URL and plink_ id, then start
+# the backend.
 ```
 
-Start purchases from the app's Unlock button so the Payment Link carries a real pass id. The webhook route is public and skips CSRF and the legal-agreement check; the `Stripe-Signature` header is its only authentication.
+Start purchases from the app's Unlock button so the Payment Link carries a real pass id. The webhook route is public and skips CSRF and the legal-agreement check; the `Stripe-Signature` header is its only authentication. It only applies `mode=payment` checkout sessions whose `payment_link` is the configured id, so `stripe trigger checkout.session.completed` is acknowledged and ignored.
 
 ## CI/CD (GitHub Actions)
 

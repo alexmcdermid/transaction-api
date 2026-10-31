@@ -29,5 +29,6 @@ app:
       webhook-secret: ""
     tax-year-pass:
       payment-link-url: ""
+      payment-link-id: ""
       price-cents: ""
       price-currency: ""
