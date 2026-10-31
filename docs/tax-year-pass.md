@@ -19,7 +19,8 @@ Inbound traffic still works, so the backend never calls Stripe:
    `client_reference_id=<pass id>`.
 2. The browser goes to Stripe, the customer pays, and Stripe redirects back to `/reports`.
 3. Stripe sends a signed webhook to the backend. Signature verification is a local HMAC check. The
-   webhook resolves the pass by `client_reference_id` and marks it `PAID`.
+   webhook checks that the session came from the tax year pass Payment Link, resolves the pass by
+   `client_reference_id`, and marks it `PAID`.
 
 Dev and local use the same flow with a test-mode Payment Link, so there is one code path.
 
@@ -63,14 +64,17 @@ export endpoint calls it before querying trades. The error is `403` with the sta
 | --- | --- | --- |
 | `app.billing.stripe.webhook-secret` | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`). |
 | `app.billing.tax-year-pass.payment-link-url` | `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL` | Payment Link URL (`https://buy.stripe.com/...`). |
+| `app.billing.tax-year-pass.payment-link-id` | `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID` | That Payment Link's id (`plink_...`). The webhook ignores checkout sessions from any other link. |
 | `app.billing.tax-year-pass.price-cents` | `APP_TAX_YEAR_PASS_PRICE_CENTS` | Optional display price, e.g. `3900`. |
 | `app.billing.tax-year-pass.price-currency` | `APP_TAX_YEAR_PASS_PRICE_CURRENCY` | Optional display currency, e.g. `CAD`. |
 
-Leave the webhook secret and Payment Link URL both blank to disable checkout. Reports then stay
-locked and `POST .../checkout` returns `503`. `BillingSettings` refuses to start on partial or
-malformed configuration: only one of the pair set, a non-`whsec_` secret, a non-https link, or
-half a display price. The display price is only for the UI. Stripe is the source of truth for
-charges, so keep it in sync with the Payment Link price by hand.
+Billing is enabled only when the webhook secret, Payment Link URL and Payment Link id are all set.
+Leave all three blank to disable it: reports stay locked, `POST .../checkout` returns
+`503 Tax year pass checkout is not configured`, and the webhook returns
+`503 Stripe webhook is not configured`. `BillingSettings` refuses to start on partial or malformed
+configuration: only some of the three set, a non-`whsec_` secret, a non-https link, an id that does
+not start with `plink_`, or half a display price. The display price is only for the UI. Stripe is
+the source of truth for charges, so keep it in sync with the Payment Link price by hand.
 
 No Stripe secret API key is needed, because the backend makes no Stripe API calls.
 
@@ -88,7 +92,10 @@ Do this once in test mode for local/dev, then again in live mode for prod.
    - Optional: allow promotion codes. A 100% code gives a zero-amount `PAID` pass, which is handy
      for comps and testing.
    - Optional: enable Stripe Tax for GST/HST once registered. No code change is needed.
-   - Copy the link URL into `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL`.
+   - Copy the link URL into `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL`, and the id shown on the Payment
+     Link's page (`plink_...`) into `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID`. A new Payment Link, for
+     example for a new price, needs both updated together. Sessions completed on the old link after
+     the switch are ignored, so unlock or refund those by hand.
 3. **Webhook endpoint:** Developers -> Webhooks -> Add endpoint
    `https://<api-origin>/api/v1/billing/stripe/webhook`. Select these events:
    - `checkout.session.completed`
@@ -97,23 +104,26 @@ Do this once in test mode for local/dev, then again in live mode for prod.
    - `charge.refunded`
 
    Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-4. **App Runner env:** add the four env vars through GitHub environment secrets.
+4. **App Runner env:** add the five env vars through GitHub environment secrets.
    `.github/workflows/ci.yml` (dev) and `deploy-prod.yml` (prod) pass them through as optional
    runtime variables: `DEV_STRIPE_WEBHOOK_SECRET`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_URL`,
-   `DEV_TAX_YEAR_PASS_PRICE_CENTS`, `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with the same names prefixed
-   `PROD_` for prod.
+   `DEV_TAX_YEAR_PASS_PAYMENT_LINK_ID`, `DEV_TAX_YEAR_PASS_PRICE_CENTS`,
+   `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with the same names prefixed `PROD_` for prod. An environment
+   that has the secret and URL but no id will not start, so add the id first.
 
 ### Local testing
 
 ```bash
 stripe login
 stripe listen --forward-to localhost:8080/api/v1/billing/stripe/webhook
-# copy the printed whsec_... into STRIPE_WEBHOOK_SECRET, then start the backend
+# copy the printed whsec_... into STRIPE_WEBHOOK_SECRET, set the test-mode Payment Link's URL and
+# plink_ id, then start the backend
 ```
 
 Use the app's **Unlock** button so the link carries a real pass id. Then pay with test card
 `4242 4242 4242 4242`, any future expiry, and any CVC. `stripe trigger checkout.session.completed`
-sends a session with no `client_reference_id`, which the webhook acknowledges and ignores by design.
+sends a session that did not come from the Payment Link, which the webhook acknowledges and ignores
+by design.
 
 To unlock a year locally without Stripe:
 
@@ -128,8 +138,17 @@ SELECT gen_random_uuid(), id, 2025, 'PAID', now(), now(), now() FROM users WHERE
 Stripe signature is the authentication. It verifies `Stripe-Signature` against the raw body with
 `Webhook.constructEvent` and the default 5-minute tolerance.
 
+**Payment Link binding:** a checkout session event changes a pass only when the session has
+`mode=payment` and its `payment_link` is the configured `plink_` id. The pass id in
+`client_reference_id` is visible in the buyer's checkout URL, so without this check it could be
+appended to any other Payment Link in the account, such as a cheaper price or a free-trial
+subscription that completes with `no_payment_required`. Any other session is logged at `WARN`
+(event id, type, `payment_link`, `mode`) and acknowledged with `200` before a pass is looked up.
+`charge.refunded` needs no check: it only matches payment intents recorded from bound sessions.
+
 | Event | Effect on the pass resolved by `client_reference_id` |
 | --- | --- |
+| `checkout.session.*` from another Payment Link, with no `payment_link`, or not in `mode=payment` | No change; no pass is looked up. `WARN`, `200` |
 | `checkout.session.completed`, `payment_status=paid` or `no_payment_required` | -> `PAID`; record session, payment intent, customer, amount, currency, `paid_at` |
 | `checkout.session.completed`, `payment_status=unpaid` (delayed methods such as ACSS debit) | -> `PROCESSING`; record session, payment intent, customer, amount, currency |
 | `checkout.session.async_payment_succeeded` | -> `PAID` |
@@ -140,18 +159,28 @@ Stripe signature is the authentication. It verifies `Stripe-Signature` against t
 
 Rules:
 
-- Responses: `200` on success, on ignored events, and on sessions whose `client_reference_id` is
-  missing, malformed, or unknown. Those are logged and acknowledged so Stripe stops retrying; they
-  need manual support. `400` means a bad or missing signature, `503` means billing is not
-  configured, and `5xx` means an unexpected processing error, which Stripe retries.
-- Rows are locked (`findByIdForUpdate`) during a transition. A transition that `canTransitionTo`
-  rejects is a no-op, so replays and out-of-order deliveries are safe.
-- **Duplicate payment:** if a pass is already `PAID` and a different checkout session completes for
-  it, nothing is overwritten. Log a `WARN` with the pass id, session id, and payment intent so an
-  operator can refund it in Stripe.
+- Responses: `200` on success, on ignored events, on sessions that fail the Payment Link binding,
+  and on sessions whose `client_reference_id` is missing, malformed, or unknown. Those are logged
+  and acknowledged so Stripe stops retrying; they need manual support. `400` means a bad or missing
+  signature. `503 Stripe webhook is not configured` means billing is off.
+  `500 Stripe event could not be processed` means an unknown `payment_status` on
+  `checkout.session.completed` or a data object that cannot be read; it is logged at `ERROR`, and
+  Stripe retries the event. Any other unexpected error is also a `5xx`.
+- Rows are locked with a native `SELECT ... FOR UPDATE` (`findByIdForUpdate`,
+  `findByStripePaymentIntentIdForUpdate`) during a transition. Native, because Hibernate renders
+  `@Lock(PESSIMISTIC_WRITE)` on PostgreSQL as `FOR NO KEY UPDATE`, which the H2 test database cannot
+  parse; the two differ only for foreign keys into `tax_year_passes`, and there are none.
+- A transition that `canTransitionTo` rejects is a no-op, so replays and out-of-order deliveries are
+  safe. Two stale deliveries that it allows are no-ops too: a late `unpaid` completion for a session
+  that already failed (`FAILED -> PROCESSING` is for a retry with a new session), and
+  `async_payment_failed` from any session other than the one a `PROCESSING` pass is waiting on.
+- **Duplicate payment:** if a pass is already `PAID` or `REFUNDED` and a different checkout session
+  completes for it, nothing is overwritten. Log a `WARN` with the pass id, session id, and payment
+  intent so an operator can refund it in Stripe.
 - **API version skew:** stripe-java pins an API version. When the endpoint's version differs,
   `EventDataObjectDeserializer.getObject()` is empty, so fall back to `deserializeUnsafe()`.
-- Never log emails, card data, or full payloads. Log the event id, type, pass id, and outcome.
+- Never log emails, card data, or full payloads. Log only ids (event, pass, checkout session,
+  payment intent, payment link), the event type, the session mode, and the outcome.
 
 ## Billing API
 
@@ -159,7 +188,8 @@ All routes require a session except the webhook.
 
 ### `GET /api/v1/billing/tax-year-passes`
 
-The caller's passes, newest tax year first, for purchase history and post-checkout polling.
+The caller's passes, newest tax year first and then newest pass first, for purchase history and
+post-checkout polling.
 
 ```json
 [
@@ -236,11 +266,15 @@ Every field is optional, and an empty body means everything for the year.
 
 - `accountIds`: an empty list means every account. Each requested id must belong to the caller,
   otherwise `403 Account access denied`. Unowned ids are not silently dropped. Max 100.
-- `includeUnassigned`: trades with no account. **Defaults to `true`** when omitted or null.
-  Explicit `false` excludes them.
+- `includeUnassigned`: trades with no account, added to the selected accounts. **Defaults to
+  `true`** when omitted or null. Explicit `false` excludes them.
 - `symbols`: trimmed and upper-cased, max 100, each at most 12 characters.
-- `assetTypes`, `currencies`, `directions`: an empty list means no filter.
+- `assetTypes`, `currencies`, `directions`: an empty list means no filter. Max 10 each.
 - Rows sort by `closed_at`, then trade id, so output is deterministic.
+- Checks run in this order: request-body validation (`400`), the tax year range
+  (`400 Tax year must be between 2000 and <current year>`), the `PAID` pass (`403`), then account
+  ownership (`403`). An invalid body is a `400` even without a pass, and an unowned account id is
+  only reported once the year is unlocked.
 
 ### `POST /api/v1/reports/tax-years/{taxYear}/summary` (pass required)
 
@@ -261,6 +295,9 @@ Body: report filters (optional). Response:
   "taxTreatment": [ SummaryRow ]
 }
 ```
+
+A year with no matching trades returns `tradeCount: 0`, empty arrays, and `null` for
+`firstClosedOn` and `lastClosedOn`.
 
 `SummaryRow`, one per group and currency:
 
@@ -285,10 +322,12 @@ Body: report filters (optional). Response:
 | --- | --- | --- |
 | `totals` | `ALL` / `All trades` | by currency |
 | `months` | `YYYY-MM` / `YYYY-MM` | chronological, then currency |
-| `accounts` | account id or `UNASSIGNED` / account name or `Unassigned`; `taxFree` set (unassigned = `false`) | label, then currency |
+| `accounts` | account id or `UNASSIGNED` / account name or `Unassigned`; `taxFree` set (unassigned = `false`) | label (case-insensitive), then currency, then key |
 | `symbols` | symbol / symbol | `netRealizedPnl` desc, then symbol, then currency |
 | `assetTypes` | `STOCK` / `Stocks`, `OPTION_CALL` / `Calls`, `OPTION_PUT` / `Puts` | that order, then currency |
 | `taxTreatment` | `TAXABLE` / `Taxable accounts`, `TAX_FREE` / `Tax-free accounts` (unassigned trades count as taxable) | that order, then currency |
+
+Currency ties sort by alphabetical ISO code, so `CAD` comes before `USD`.
 
 Metric definitions, applied identically to every group:
 
@@ -314,11 +353,17 @@ Metric definitions, applied identically to every group:
 
 - `reportType` is required: `TRADE_LEDGER`, `DISPOSITIONS`, `ANNUAL_SUMMARY`, or
   `REPURCHASE_REVIEW`.
-- `filters` is optional (shape above). `includeNotes` only affects `TRADE_LEDGER` and defaults to
-  `false`.
+- `filters` is optional (shape above).
+- `includeNotes` only affects `TRADE_LEDGER`. It is a `Boolean`, so omitted or `null` means `false`.
+  It is not a primitive because Jackson 3 fails on `null` primitives (`FAIL_ON_NULL_FOR_PRIMITIVES`
+  is on by default).
 - Response `200`, `Content-Type: text/csv; charset=UTF-8`,
   `Content-Disposition: attachment; filename="tradelog-<year>-<slug>.csv"`,
-  `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
+  `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`. The body is CSV whatever the
+  `Accept` header asks for.
+- The frontend calls the API cross-origin, so CORS exposes `Content-Disposition`
+  (`Access-Control-Expose-Headers`, set in both `SecurityConfig` and `CorsConfig`) for it to read the
+  filename.
 - Slugs: `trade-ledger`, `dispositions`, `annual-summary`, `repurchase-review`.
 - A valid empty result returns the header row only.
 
@@ -326,11 +371,13 @@ CSV rules, shared by every export:
 
 - Use Apache Commons CSV (`CSVFormat.DEFAULT`, CRLF records). Never hand-roll quoting.
 - **Formula injection:** text cells (symbols, account names, notes, descriptions, labels) starting
-  with `=`, `+`, `-`, `@`, tab, CR, or LF get a leading `'`. Numeric cells are written as plain
-  decimals and are never prefixed.
+  with `=`, `+`, `-`, `@`, tab, CR, or LF get a leading `'`. Only the first character is checked.
+  Numeric cells are written as plain decimals and are never prefixed.
 - Decimals use `BigDecimal.toPlainString()`, so there is no exponent notation and no locale
-  grouping. Dates use ISO `yyyy-MM-dd` and instants ISO-8601 UTC. Booleans are `true`/`false`,
-  blank when unknown.
+  grouping. Money always has 2 decimals (`HALF_UP`). Quantities, prices, strikes, and margin rates
+  drop trailing zeros, e.g. `100`, `1.1`, `150`. Dates use ISO `yyyy-MM-dd` and instants ISO-8601
+  UTC. Booleans are `true`/`false`, blank when unknown.
+- UTF-8 without a byte order mark.
 - No auth ids, emails, internal user ids, or Stripe ids. Never log CSV contents or notes.
 
 #### `TRADE_LEDGER`: every filtered closed trade, as recorded
@@ -346,6 +393,8 @@ opened_at,closed_at,gross_pnl,recorded_realized_pnl,notes,created_at,updated_at
 - `margin_interest` comes from `TradeCalculations.marginInterest`.
   `recorded_realized_pnl = gross_pnl - fees - margin_interest` as stored on the trade.
 - `notes` is blank unless `includeNotes=true`. The column always exists.
+- Unassigned trades have a blank `account_id`, `account_name` `Unassigned`, and `account_tax_free`
+  `false`.
 
 #### `DISPOSITIONS`: proceeds and cost per closed trade, taxable accounts only
 
@@ -411,6 +460,17 @@ days_from_loss,possible_same_position
 - Keep this disclosure next to exports:
   > Exports summarize trades recorded in tradelog. They are not official tax slips, tax filings,
   > or tax advice. Amounts are in each trade's recorded currency, with no exchange-rate conversion.
+
+## Known limitations
+
+- **Refund before checkout:** a pass learns its payment intent from the checkout event, so a full
+  refund delivered before that event matches no pass. It is only logged at `WARN`
+  (`... matches no tax year pass ... revoke it by hand`). The pass still unlocks when the checkout
+  event arrives, and an operator has to revoke it.
+- **Formula-injection guard:** it checks the leading character only. Every text cell is the account
+  owner's own data, so a crafted value can only reach that owner's spreadsheet.
+- **No UTF-8 BOM:** Excel can mis-decode non-ASCII text, such as accented account names, when it
+  opens the file directly. Importing the file as UTF-8 works.
 
 ## Not done yet
 
