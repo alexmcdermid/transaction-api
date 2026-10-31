@@ -159,8 +159,6 @@ class BillingControllerTest {
         paidPass.setCurrency("CAD");
         paidPass.setPaidAt(Instant.parse("2025-02-03T18:22:11Z"));
         taxYearPassRepository.save(paidPass);
-        // Compare with the stored value: H2 under the PostgreSQL dialect shifts instants on the round trip.
-        Instant storedPaidAt = taxYearPassRepository.findById(paidPass.getId()).orElseThrow().getPaidAt();
         TaxYearPass pendingPass = savePass(authId, TAX_YEAR, TaxYearPassStatus.PENDING);
 
         mockMvc.perform(get(ApiPaths.BILLING_TAX_YEAR_PASSES).header("X-User-Id", authId))
@@ -176,7 +174,7 @@ class BillingControllerTest {
                 .andExpect(jsonPath("$[1].status").value("PAID"))
                 .andExpect(jsonPath("$[1].amountTotal").value(3900))
                 .andExpect(jsonPath("$[1].currency").value("CAD"))
-                .andExpect(jsonPath("$[1].paidAt").value(storedPaidAt.toString()))
+                .andExpect(jsonPath("$[1].paidAt").value("2025-02-03T18:22:11Z"))
                 .andExpect(jsonPath("$[1].refundedAt").doesNotExist());
     }
 

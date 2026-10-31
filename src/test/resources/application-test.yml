@@ -10,6 +10,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        # The PostgreSQL dialect binds an Instant as a UTC wall-clock Timestamp, which H2 reads back in the JVM's
+        # time zone, so every write shifted instants by the local UTC offset. H2 stores OffsetDateTime exactly.
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP_WITH_TIMEZONE
   flyway:
     enabled: true
     baseline-on-migrate: true
