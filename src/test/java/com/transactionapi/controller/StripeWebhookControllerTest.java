@@ -194,6 +194,22 @@ class StripeWebhookControllerTest {
     }
 
     @Test
+    void fullRefundOfADelayedPaymentStaysRefundedWhenAsyncSuccessArrivesLate() throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        CheckoutSession session = CheckoutSession.unpaid(pass);
+        postWebhook(checkoutSessionEvent("checkout.session.completed", session)).andExpect(status().isOk());
+
+        postWebhook(chargeRefundedEvent(session.paymentIntentId(), true)).andExpect(status().isOk());
+        postWebhook(checkoutSessionEvent("checkout.session.async_payment_succeeded", session.withPaymentStatus("paid")))
+                .andExpect(status().isOk());
+
+        TaxYearPass refunded = reload(pass);
+        assertThat(refunded.getStatus()).isEqualTo(TaxYearPassStatus.REFUNDED);
+        assertThat(refunded.getRefundedAt()).isNotNull();
+        assertThat(refunded.getPaidAt()).isNull();
+    }
+
+    @Test
     void fullRefundMatchingNoPassIsLoggedForManualReview(CapturedOutput output) throws Exception {
         String unmatchedPaymentIntentId = uniqueId("pi_test_");
 

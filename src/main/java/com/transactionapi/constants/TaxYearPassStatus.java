@@ -22,7 +22,8 @@ public enum TaxYearPassStatus {
     private Set<TaxYearPassStatus> allowedNext() {
         return switch (this) {
             case PENDING -> EnumSet.of(PROCESSING, PAID, FAILED);
-            case PROCESSING -> EnumSet.of(PAID, FAILED);
+            // A full refund can overtake a delayed async_payment_succeeded delivery; REFUNDED then makes it a no-op.
+            case PROCESSING -> EnumSet.of(PAID, FAILED, REFUNDED);
             case FAILED -> EnumSet.of(PROCESSING, PAID);
             case PAID -> EnumSet.of(REFUNDED);
             case REFUNDED -> EnumSet.noneOf(TaxYearPassStatus.class);

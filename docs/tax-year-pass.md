@@ -45,7 +45,7 @@ webhooks are harmless:
 
 ```text
 PENDING    -> PROCESSING | PAID | FAILED
-PROCESSING -> PAID | FAILED
+PROCESSING -> PAID | FAILED | REFUNDED   (a full refund can arrive before a late async success)
 FAILED     -> PROCESSING | PAID      (customer retries the same pass)
 PAID       -> REFUNDED
 REFUNDED   -> (terminal; buying again creates a new PENDING pass)
