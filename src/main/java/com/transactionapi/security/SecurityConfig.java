@@ -83,6 +83,8 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", ApiPaths.HEALTH, ApiPaths.AUTH_CSRF, ApiPaths.AUTH_LOGIN, ApiPaths.AUTH_LOGOUT).permitAll()
+                // Stripe authenticates the webhook with its Stripe-Signature header, not a session.
+                .requestMatchers(HttpMethod.POST, ApiPaths.BILLING_STRIPE_WEBHOOK).permitAll()
                 .requestMatchers(HttpMethod.GET, ApiPaths.SHARES + "/*").permitAll()
                 // Exact path only: /users/me/* sub-routes stay authenticated.
                 .requestMatchers(HttpMethod.GET, ApiPaths.USER_ME).permitAll()
@@ -120,6 +122,10 @@ public class SecurityConfig {
                 return false;
             }
             if (StringUtils.hasText(request.getHeader("Authorization"))) {
+                return false;
+            }
+            // Server-to-server call that never carries the browser's session cookie or CSRF token.
+            if ("POST".equals(method) && ApiPaths.BILLING_STRIPE_WEBHOOK.equals(request.getRequestURI())) {
                 return false;
             }
             if (allowHeaderAuth

@@ -22,3 +22,12 @@ app:
     jwt:
       enabled: false
     allow-header-auth: true
+  # Billing stays off by default, even when a developer's shell exports the Stripe env vars from
+  # local webhook testing. Tests that need checkout enable it with @TestPropertySource.
+  billing:
+    stripe:
+      webhook-secret: ""
+    tax-year-pass:
+      payment-link-url: ""
+      price-cents: ""
+      price-currency: ""

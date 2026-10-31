@@ -102,6 +102,9 @@ public class LegalAgreementFilter extends OncePerRequestFilter {
         if (HttpMethod.GET.matches(method) && path.startsWith(ApiPaths.SHARES + "/")) {
             return true;
         }
+        if (HttpMethod.POST.matches(method) && path.equals(ApiPaths.BILLING_STRIPE_WEBHOOK)) {
+            return true;
+        }
         return isHeaderAuthProfile() && StringUtils.hasText(request.getHeader(headerName));
     }
 
