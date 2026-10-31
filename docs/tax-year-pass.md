@@ -80,7 +80,10 @@ No Stripe secret API key is needed, because the backend makes no Stripe API call
 
 ## Stripe setup runbook
 
-Do this once in test mode for local/dev, then again in live mode for prod.
+Do this in test mode for local and for dev, then in live mode for prod. Local and dev each need their
+own test-mode Payment Link, because a link has a single redirect URL. Every test-mode event reaches
+both (`stripe listen` locally, the webhook endpoint on dev), and each ignores the other's checkout
+sessions because the Payment Link ids differ.
 
 1. **Product and price:** Products -> Add product `tradelog Tax Year Pass`. Add a one-time price,
    e.g. 39.00 CAD.
@@ -92,10 +95,13 @@ Do this once in test mode for local/dev, then again in live mode for prod.
    - Optional: allow promotion codes. A 100% code gives a zero-amount `PAID` pass, which is handy
      for comps and testing.
    - Optional: enable Stripe Tax for GST/HST once registered. No code change is needed.
-   - Copy the link URL into `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL`, and the id shown on the Payment
-     Link's page (`plink_...`) into `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID`. A new Payment Link, for
-     example for a new price, needs both updated together. Sessions completed on the old link after
-     the switch are ignored, so unlock or refund those by hand.
+   - Copy the link URL into `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL`, and its id (`plink_...`, the end
+     of the Payment Link's Dashboard URL) into `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID`.
+   - To replace the link, for example for a new price, update both values together and deactivate
+     the old link. Sessions completed on the old link after the switch are ignored, so unlock or
+     refund those by hand (see [Support](#support)).
+   - Receipts are an account setting: turn on Stripe's customer emails for successful payments. The
+     app sends no email itself.
 3. **Webhook endpoint:** Developers -> Webhooks -> Add endpoint
    `https://<api-origin>/api/v1/billing/stripe/webhook`. Select these events:
    - `checkout.session.completed`
@@ -103,13 +109,20 @@ Do this once in test mode for local/dev, then again in live mode for prod.
    - `checkout.session.async_payment_failed`
    - `charge.refunded`
 
-   Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+   Create it at the API version stripe-java pins (`2026-10-28.endive` for stripe-java 34.1.0), and
+   match the endpoint to the new version when stripe-java is upgraded. Other versions only get a
+   best-effort parse (see API version skew under [Webhook handling](#webhook-handling)). Copy the
+   signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. **App Runner env:** add the five env vars through GitHub environment secrets.
    `.github/workflows/ci.yml` (dev) and `deploy-prod.yml` (prod) pass them through as optional
    runtime variables: `DEV_STRIPE_WEBHOOK_SECRET`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_URL`,
    `DEV_TAX_YEAR_PASS_PAYMENT_LINK_ID`, `DEV_TAX_YEAR_PASS_PRICE_CENTS`,
    `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with the same names prefixed `PROD_` for prod. An environment
    that has the secret and URL but no id will not start, so add the id first.
+
+   Shared dev App Runner is paused while no PR needs it. Stripe's deliveries to dev fail meanwhile
+   and are retried only for a limited time, so test dev checkouts while a PR keeps dev running, or
+   resend the event from the Dashboard.
 
 ### Local testing
 
@@ -125,12 +138,7 @@ Use the app's **Unlock** button so the link carries a real pass id. Then pay wit
 sends a session that did not come from the Payment Link, which the webhook acknowledges and ignores
 by design.
 
-To unlock a year locally without Stripe:
-
-```sql
-INSERT INTO tax_year_passes (id, user_id, tax_year, status, paid_at, created_at, updated_at)
-SELECT gen_random_uuid(), id, 2025, 'PAID', now(), now(), now() FROM users WHERE auth_id = '<auth id>';
-```
+To unlock a year locally without Stripe, use the insert under [Support](#support).
 
 ## Webhook handling
 
@@ -182,6 +190,46 @@ Rules:
 - Never log emails, card data, or full payloads. Log only ids (event, pass, checkout session,
   payment intent, payment link), the event type, the session mode, and the outcome.
 
+## Support
+
+The webhook acknowledges cases that need a person and only logs them, at `WARN` from
+`StripeWebhookService`:
+
+| Log message contains | What to do |
+| --- | --- |
+| `was not applied. Refund that payment in Stripe.` | A second payment for a pass that is already `PAID` or `REFUNDED`. Refund the named payment intent in Stripe. |
+| `matches no tax year pass` | Usually a refund of another product's charge; nothing to do. If it overtook its checkout event, a pass records that payment intent later: revoke that pass. |
+| `not the tax year pass payment link` | A session from another Payment Link. If it bought a tax year pass on a replaced link, unlock that pass or refund the payment; otherwise ignore it. |
+| `missing or malformed client_reference_id`, `): no tax year pass` | A payment that names no usable pass. Find the buyer in Stripe, then insert a pass or refund the payment. |
+
+A checkout session's `client_reference_id` in the Stripe Dashboard is the pass id. Recording the
+payment intent on a pass by hand lets a later full refund in Stripe revoke it automatically.
+
+```sql
+-- A user's passes
+SELECT p.id, p.tax_year, p.status, p.stripe_checkout_session_id, p.stripe_payment_intent_id, p.paid_at, p.refunded_at
+FROM tax_year_passes p JOIN users u ON u.id = p.user_id
+WHERE u.email = '<email>'
+ORDER BY p.tax_year DESC, p.created_at DESC;
+
+-- Unlock an existing pass
+UPDATE tax_year_passes
+SET status = 'PAID', stripe_checkout_session_id = 'cs_...', stripe_payment_intent_id = 'pi_...',
+    paid_at = now(), updated_at = now()
+WHERE id = '<pass id>' AND status IN ('PENDING', 'FAILED');
+
+-- Unlock a year that has no usable pass. Locally without Stripe, leave the Stripe ids NULL and
+-- match the user by auth_id instead.
+INSERT INTO tax_year_passes (id, user_id, tax_year, status, stripe_checkout_session_id,
+                             stripe_payment_intent_id, paid_at, created_at, updated_at)
+SELECT gen_random_uuid(), id, 2025, 'PAID', 'cs_...', 'pi_...', now(), now(), now()
+FROM users WHERE email = '<email>';
+
+-- Revoke a pass whose payment was refunded
+UPDATE tax_year_passes SET status = 'REFUNDED', refunded_at = now(), updated_at = now()
+WHERE id = '<pass id>' AND status = 'PAID';
+```
+
 ## Billing API
 
 All routes require a session except the webhook.
@@ -227,6 +275,11 @@ returns the Payment Link URL for the browser to open.
 The overview is free. Everything else requires a `PAID` pass for `{taxYear}`. The tax year is the
 calendar year of each trade's `closed_at`. All amounts stay in each trade's **recorded currency**.
 Nothing is FX-converted, and every aggregate row carries a `currency`.
+
+Reports read only what each trade stores (prices, quantity, fees, `margin_rate`, dates, recorded
+realized P/L) and its account's name and tax-free flag. User preferences such as the tax-estimate
+rates and detailed trade times, account default fees and margin rates (they only prefill new
+trades), and trade history snapshots deliberately play no part.
 
 ### `GET /api/v1/reports/tax-years` (free)
 
@@ -473,6 +526,15 @@ days_from_loss,possible_same_position
   owner's own data, so a crafted value can only reach that owner's spreadsheet.
 - **No UTF-8 BOM:** Excel can mis-decode non-ASCII text, such as accented account names, when it
   opens the file directly. Importing the file as UTF-8 works.
+- **Trade date, not settlement date:** the tax year follows each trade's `closed_at` date, and
+  trades store no settlement date. CRA places a disposition in the year it settles (T+1), so a trade
+  closed on the last trading day of December can belong to the next CRA tax year.
+- **Deleting an account** unassigns its trades (`ON DELETE SET NULL`), and unassigned trades count as
+  taxable. Deleting a tax-free account therefore moves its trades into `DISPOSITIONS` and the taxable
+  totals. The frontend deletes accounts without a warning.
+- **Two checkouts racing:** checkout requests for the same user and year that interleave can each
+  create a `PENDING` pass. Paying both leaves two `PAID` passes and no duplicate-payment `WARN`. The
+  frontend blocks repeat clicks while a checkout starts, so this takes two tabs within milliseconds.
 
 ## Not done yet
 
@@ -483,4 +545,7 @@ days_from_loss,possible_same_position
   `Trade` model records closed round trips only.
 - **Disputes:** `charge.dispute.*` is not handled. Refund or revoke manually.
 - **Admin comps/grants:** use a 100% promotion code for now.
+- **Admin view of passes:** the admin page shows no passes (its `Premium` column is unrelated
+  legacy state). Use the Stripe Dashboard and the [Support](#support) SQL.
+- **Alerts** on the [Support](#support) `WARN` lines, for example a CloudWatch Logs metric filter.
 - **Saved or custom report definitions.**

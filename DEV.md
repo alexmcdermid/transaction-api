@@ -30,6 +30,9 @@
 ### Authenticated
 - `GET /api/v1/billing/tax-year-passes` — the caller's tax year passes, newest tax year first
 - `POST /api/v1/billing/tax-year-passes/{taxYear}/checkout` — returns the Stripe Payment Link URL for that tax year
+- `GET /api/v1/reports/tax-years` — tax years with closed trades, their pass status and whether checkout is available (free)
+- `POST /api/v1/reports/tax-years/{taxYear}/summary` — annual summary for that tax year (requires a `PAID` tax year pass)
+- `POST /api/v1/reports/tax-years/{taxYear}/exports` — CSV export for that tax year (requires a `PAID` tax year pass)
 - `GET /api/v1/trades` — list trades for the caller
 - `GET /api/v1/trades/paged` — paginated trades with optional month filter
 - `POST /api/v1/trades` — create a trade (stocks or options, long or short)
