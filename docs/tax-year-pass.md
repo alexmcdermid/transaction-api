@@ -32,8 +32,8 @@ Dev and local use the same flow with a test-mode Payment Link, so there is one c
 | --- | --- |
 | `id` | UUID. Also the Payment Link `client_reference_id`. Unguessable. |
 | `user_id` | FK to `users.id` (internal UUID, not the auth id). |
-| `tax_year` | Calendar year of trade `closed_at` dates. |
-| `status` | `PENDING`, `PROCESSING`, `PAID`, `FAILED`, `REFUNDED`. |
+| `tax_year` | Calendar year of trade `closed_at` dates. `CHECK (tax_year >= 2000)`. |
+| `status` | `PENDING`, `PROCESSING`, `PAID`, `FAILED`, `REFUNDED`. A `CHECK` allows only these, so a typo in hand-written SQL fails at once instead of making that user's overview and pass list fail to load. |
 | `stripe_checkout_session_id` | Unique. Set from the completed checkout session. |
 | `stripe_payment_intent_id` | Used to match `charge.refunded`. |
 | `stripe_customer_id` | Support lookups only. |
