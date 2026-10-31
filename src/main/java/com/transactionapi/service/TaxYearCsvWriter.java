@@ -147,8 +147,10 @@ public class TaxYearCsvWriter {
     }
 
     /**
-     * LONG sells at exit and bought at entry; SHORT sold at entry and bought back at exit. Outlays are
-     * derived as {@code proceeds - cost - gainLoss} so every row foots exactly to the recorded P/L.
+     * LONG sells at exit and bought at entry; SHORT sold at entry and bought back at exit. Outlays are the
+     * recorded fees, and {@code gainLoss = proceeds - cost - outlays}, so every row foots exactly. Estimated
+     * margin interest is a cost of borrowing, not of the sale, so it stays out: gain/loss exceeds recorded
+     * realized P/L by that interest.
      */
     static Disposition disposition(Trade trade) {
         BigDecimal units = trade.getQuantity().multiply(TradeCalculations.multiplier(trade.getAssetType()));
@@ -157,8 +159,8 @@ public class TaxYearCsvWriter {
         boolean isShort = trade.getDirection() == TradeDirection.SHORT;
         BigDecimal proceeds = isShort ? entryValue : exitValue;
         BigDecimal cost = isShort ? exitValue : entryValue;
-        BigDecimal gainLoss = trade.getRealizedPnl().setScale(2, RoundingMode.HALF_UP);
-        return new Disposition(proceeds, cost, proceeds.subtract(cost).subtract(gainLoss), gainLoss);
+        BigDecimal outlaysAndExpenses = trade.getFees().setScale(2, RoundingMode.HALF_UP);
+        return new Disposition(proceeds, cost, outlaysAndExpenses, proceeds.subtract(cost).subtract(outlaysAndExpenses));
     }
 
     /** {@code 100 AAPL} for stock, {@code 2 AAPL 2025-03-21 150 CALL} for options. */

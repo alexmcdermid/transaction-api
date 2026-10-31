@@ -267,18 +267,33 @@ class TaxYearCsvWriterTest {
     @Test
     void shortOptionProceedsAreThePremiumReceived() {
         Trade shortPut = trade("SPY").option(OptionType.PUT, "512.5000", LocalDate.of(2025, 6, 20))
-                .direction(TradeDirection.SHORT).quantity("3").prices("4.20", "1.05").fees("1.95").marginRate("5.00")
-                .heldBetween(LocalDate.of(2025, 5, 1), LocalDate.of(2025, 5, 31)).build();
+                .direction(TradeDirection.SHORT).quantity("3").prices("4.20", "1.05").fees("1.95").build();
 
         CSVRecord record = parse(writer.dispositions(List.of(shortPut), reportAccounts)).getFirst();
 
-        // margin interest: 1260 notional * 5% * 30/365 = 5.18
         assertThat(record.get("description")).isEqualTo("3 SPY 2025-06-20 512.5 PUT");
         assertThat(record.get("position")).isEqualTo("SHORT");
         assertThat(record.get("proceeds")).isEqualTo("1260.00");
         assertThat(record.get("cost")).isEqualTo("315.00");
-        assertThat(record.get("gain_loss")).isEqualTo("937.87");
-        assertThat(record.get("outlays_and_expenses")).isEqualTo("7.13");
+        assertThat(record.get("outlays_and_expenses")).isEqualTo("1.95");
+        assertThat(record.get("gain_loss")).isEqualTo("943.05");
+    }
+
+    @Test
+    void outlaysAreTheRecordedFeesWithoutEstimatedMarginInterest() {
+        Trade marginLong = trade("AAPL").quantity("100").prices("150.00", "160.00").fees("2.00").marginRate("7.30")
+                .heldBetween(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 2, 20)).build();
+
+        CSVRecord ledger = parse(writer.tradeLedger(List.of(marginLong), reportAccounts, false)).getFirst();
+        CSVRecord disposition = parse(writer.dispositions(List.of(marginLong), reportAccounts)).getFirst();
+
+        // margin interest: 15000 notional * 7.3% * 50/365 = 150.00, already taken out of recorded realized P/L
+        assertThat(ledger.get("margin_interest")).isEqualTo("150.00");
+        assertThat(ledger.get("recorded_realized_pnl")).isEqualTo("848.00");
+        assertThat(disposition.get("proceeds")).isEqualTo("16000.00");
+        assertThat(disposition.get("cost")).isEqualTo("15000.00");
+        assertThat(disposition.get("outlays_and_expenses")).isEqualTo("2.00");
+        assertThat(disposition.get("gain_loss")).isEqualTo("998.00");
     }
 
     @Test
@@ -296,8 +311,10 @@ class TaxYearCsvWriterTest {
         assertThat(half.outlaysAndExpenses()).isEqualTo("0.00");
         assertThat(third.proceeds()).isEqualTo("0.34");
         assertThat(third.cost()).isEqualTo("0.33");
-        assertThat(third.gainLoss()).isEqualTo("0.00");
-        assertThat(third.outlaysAndExpenses()).isEqualTo("0.01");
+        // Rounding proceeds and cost separately puts gain/loss 0.01 off the recorded 0.00; outlays stay the fees.
+        assertThat(thirdShare.getRealizedPnl()).isEqualTo("0.00");
+        assertThat(third.outlaysAndExpenses()).isEqualTo("0.00");
+        assertThat(third.gainLoss()).isEqualTo("0.01");
     }
 
     @Test

@@ -412,11 +412,13 @@ proceeds,cost,outlays_and_expenses,gain_loss,account_name
 - `LONG`: `proceeds = exit * qty * multiplier`, `cost = entry * qty * multiplier`.
 - `SHORT`: `proceeds = entry * qty * multiplier`, `cost = exit * qty * multiplier`.
 - `proceeds` and `cost` are rounded to 2 decimals, `HALF_UP`.
-- `gain_loss` = recorded realized P/L.
-- `outlays_and_expenses` = `proceeds - cost - gain_loss` (recorded fees plus estimated margin
-  interest). Deriving it this way guarantees every row foots exactly
-  (`proceeds - cost - outlays_and_expenses = gain_loss`). It can differ from `fees + margin_interest`
-  by 0.01 from rounding.
+- `outlays_and_expenses` = recorded fees. A trade records a single fee amount, so buying and selling
+  commissions both land here instead of being split between `cost` and outlays; the gain is the same
+  either way.
+- `gain_loss` = `proceeds - cost - outlays_and_expenses`, so every row foots exactly.
+- Estimated margin interest is left out. It is a cost of borrowing, not of the sale, and an estimate
+  besides; `TRADE_LEDGER` and `ANNUAL_SUMMARY` report it. So `gain_loss` = recorded realized P/L +
+  estimated margin interest, give or take 0.01 from rounding `proceeds` and `cost` separately.
 
 #### `ANNUAL_SUMMARY`: the summary sections as one long-format CSV
 
