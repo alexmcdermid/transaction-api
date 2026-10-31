@@ -69,6 +69,11 @@ public class StripeWebhookService {
         } catch (SignatureVerificationException ex) {
             log.warn("Rejected Stripe webhook: {}", ex.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Stripe-Signature header");
+        } catch (NumberFormatException | IndexOutOfBoundsException ex) {
+            // stripe-java parses the header without guards, so a malformed t= or v1= element ("t=abc", a bare
+            // "v1") escapes as one of these instead of a SignatureVerificationException.
+            log.warn("Rejected Stripe webhook: malformed Stripe-Signature header");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Stripe-Signature header");
         }
     }
 
@@ -128,8 +133,11 @@ public class StripeWebhookService {
         }
         List<WebhookUpdate> updates = taxYearPassService.markRefunded(charge.getPaymentIntent());
         if (updates.isEmpty()) {
-            log.info(
-                    "Stripe event {} ({}): no tax year pass for payment intent {}; ignored",
+            // Usually another product's charge. But a pass learns its payment intent from its checkout event,
+            // so a refund that overtakes a delayed checkout delivery lands here and that pass would still unlock.
+            log.warn(
+                    "Stripe event {} ({}): full refund of payment intent {} matches no tax year pass; acknowledged "
+                            + "without changes. If a tax year pass records this payment intent later, revoke it by hand.",
                     event.getId(),
                     event.getType(),
                     charge.getPaymentIntent()

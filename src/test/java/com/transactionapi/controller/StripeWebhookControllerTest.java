@@ -15,6 +15,7 @@ import com.transactionapi.repository.TaxYearPassRepository;
 import com.transactionapi.service.UserService;
 import java.time.Instant;
 import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -125,6 +126,45 @@ class StripeWebhookControllerTest {
     }
 
     @Test
+    void redeliveredFailureOfAnEarlierAttemptDoesNotFailTheRetryStillClearing() throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        CheckoutSession firstAttempt = CheckoutSession.unpaid(pass);
+        CheckoutSession retry = CheckoutSession.unpaid(pass);
+        String firstAttemptFailed = checkoutSessionEvent("checkout.session.async_payment_failed", firstAttempt);
+        postWebhook(checkoutSessionEvent("checkout.session.completed", firstAttempt)).andExpect(status().isOk());
+        postWebhook(firstAttemptFailed).andExpect(status().isOk());
+        postWebhook(checkoutSessionEvent("checkout.session.completed", retry)).andExpect(status().isOk());
+
+        // Stripe delivers events at least once, and the dashboard can resend them.
+        postWebhook(firstAttemptFailed).andExpect(status().isOk());
+
+        TaxYearPass updated = reload(pass);
+        assertThat(updated.getStatus()).isEqualTo(TaxYearPassStatus.PROCESSING);
+        assertThat(updated.getStripeCheckoutSessionId()).isEqualTo(retry.id());
+        assertThat(updated.getStripePaymentIntentId()).isEqualTo(retry.paymentIntentId());
+    }
+
+    @Test
+    void failedSecondSessionDoesNotFailThePaymentStillClearing() throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        CheckoutSession clearing = CheckoutSession.unpaid(pass);
+        CheckoutSession secondTab = CheckoutSession.unpaid(pass);
+        postWebhook(checkoutSessionEvent("checkout.session.completed", clearing)).andExpect(status().isOk());
+        postWebhook(checkoutSessionEvent("checkout.session.completed", secondTab)).andExpect(status().isOk());
+
+        postWebhook(checkoutSessionEvent("checkout.session.async_payment_failed", secondTab)).andExpect(status().isOk());
+
+        TaxYearPass stillClearing = reload(pass);
+        assertThat(stillClearing.getStatus()).isEqualTo(TaxYearPassStatus.PROCESSING);
+        assertThat(stillClearing.getStripeCheckoutSessionId()).isEqualTo(clearing.id());
+        assertThat(stillClearing.getStripePaymentIntentId()).isEqualTo(clearing.paymentIntentId());
+
+        postWebhook(checkoutSessionEvent("checkout.session.async_payment_failed", clearing)).andExpect(status().isOk());
+
+        assertThat(reload(pass).getStatus()).isEqualTo(TaxYearPassStatus.FAILED);
+    }
+
+    @Test
     void fullRefundRevokesThePass() throws Exception {
         TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
         CheckoutSession session = CheckoutSession.paid(pass);
@@ -149,6 +189,17 @@ class StripeWebhookControllerTest {
         TaxYearPass stillPaid = reload(pass);
         assertThat(stillPaid.getStatus()).isEqualTo(TaxYearPassStatus.PAID);
         assertThat(stillPaid.getRefundedAt()).isNull();
+    }
+
+    @Test
+    void fullRefundMatchingNoPassIsLoggedForManualReview(CapturedOutput output) throws Exception {
+        String unmatchedPaymentIntentId = uniqueId("pi_test_");
+
+        postWebhook(chargeRefundedEvent(unmatchedPaymentIntentId, true)).andExpect(status().isOk());
+
+        assertThat(output.getAll().lines().filter(line -> line.contains(unmatchedPaymentIntentId)))
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains("WARN", "matches no tax year pass", "revoke it by hand");
     }
 
     @Test
@@ -265,6 +316,21 @@ class StripeWebhookControllerTest {
         postWebhook(payload.replace("\"amount_total\": 3900", "\"amount_total\": 1"), signedThenTampered)
                 .andExpect(status().isBadRequest());
         postWebhook(payload, signedTooLongAgo).andExpect(status().isBadRequest());
+
+        assertThat(reload(pass).getStatus()).isEqualTo(TaxYearPassStatus.PENDING);
+    }
+
+    @Test
+    void rejectsAMalformedSignatureHeader() throws Exception {
+        TaxYearPass pass = savePass(TaxYearPassStatus.PENDING);
+        String payload = checkoutSessionEvent("checkout.session.completed", CheckoutSession.paid(pass));
+
+        // stripe-java fails on these with NumberFormatException or ArrayIndexOutOfBoundsException.
+        for (String malformedHeader : new String[]{"t=abc,v1=00", "t=99999999999999999999,v1=00", "t", "t=1700000000,v1"}) {
+            postWebhook(payload, malformedHeader)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Invalid Stripe-Signature header"));
+        }
 
         assertThat(reload(pass).getStatus()).isEqualTo(TaxYearPassStatus.PENDING);
     }

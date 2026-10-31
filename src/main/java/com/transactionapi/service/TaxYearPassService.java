@@ -162,9 +162,17 @@ public class TaxYearPassService {
                     currentStatus
             );
         }
-        // FAILED -> PROCESSING exists for a retry with a new session. The session that already failed
-        // reporting "unpaid" is a late delivery and must not leave the pass stuck in PROCESSING.
-        if (sameSession && currentStatus == TaxYearPassStatus.FAILED && targetStatus == TaxYearPassStatus.PROCESSING) {
+        // canTransitionTo cannot see sessions, so it lets two stale deliveries through. FAILED -> PROCESSING is for
+        // a retry with a new session, not the failed session reporting "unpaid" late. A PROCESSING pass waits on
+        // the session that moved it there, so a failure from another session (a redelivered earlier attempt, a
+        // second tab) must not reopen checkout while that payment clears.
+        boolean lateUnpaidForFailedSession = sameSession
+                && currentStatus == TaxYearPassStatus.FAILED
+                && targetStatus == TaxYearPassStatus.PROCESSING;
+        boolean failureFromAnotherSession = !sameSession
+                && currentStatus == TaxYearPassStatus.PROCESSING
+                && targetStatus == TaxYearPassStatus.FAILED;
+        if (lateUnpaidForFailedSession || failureFromAnotherSession) {
             return new WebhookUpdate(passId, WebhookOutcome.UNCHANGED, currentStatus);
         }
         pass.setStatus(targetStatus);
