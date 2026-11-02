@@ -35,6 +35,23 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
 
     List<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(String userId, LocalDate start, LocalDate end);
 
+    /**
+     * Margin trades that accrue at least one day of margin between start and end (inclusive).
+     * Margin accrues from openedAt up to, but not including, closedAt.
+     */
+    @Query("""
+            select t from Trade t
+            where t.userId = :userId
+              and t.marginRate > 0
+              and t.openedAt <= :end
+              and t.closedAt > :start
+            """)
+    List<Trade> findMarginTradesHeldBetween(
+            @Param("userId") String userId,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end
+    );
+
     Optional<Trade> findByIdAndUserId(UUID id, String userId);
     
     @Query("select count(t) from Trade t where t.userId = :userId")
