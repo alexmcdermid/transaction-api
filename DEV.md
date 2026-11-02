@@ -25,8 +25,14 @@
 - `GET /api/v1/auth/csrf` — returns the CSRF header name and token for browser session requests
 - `POST /api/v1/auth/login` — validates a Google credential and creates the session cookie
 - `POST /api/v1/auth/logout` — invalidates the session cookie
+- `POST /api/v1/billing/stripe/webhook` — Stripe webhook, authenticated by the `Stripe-Signature` header (see [Tax year pass billing](#tax-year-pass-billing))
 
 ### Authenticated
+- `GET /api/v1/billing/tax-year-passes` — the caller's tax year passes, newest tax year first
+- `POST /api/v1/billing/tax-year-passes/{taxYear}/checkout` — returns the Stripe Payment Link URL for that tax year
+- `GET /api/v1/reports/tax-years` — tax years with closed trades, their pass status and whether checkout is available (free)
+- `POST /api/v1/reports/tax-years/{taxYear}/summary` — annual summary for that tax year (requires a `PAID` tax year pass)
+- `POST /api/v1/reports/tax-years/{taxYear}/exports` — CSV export for that tax year (requires a `PAID` tax year pass)
 - `GET /api/v1/trades` — list trades for the caller
 - `GET /api/v1/trades/paged` — paginated trades with optional month filter
 - `POST /api/v1/trades` — create a trade (stocks or options, long or short)
@@ -160,6 +166,32 @@ Only if App Runner logs `Endpoint ID is not specified`, add Neon's endpoint opti
 ```
 
 If App Runner logs `password authentication failed`, App Runner reached Neon and the remaining issue is the database role/password value.
+
+## Tax year pass billing
+
+A tax year pass is a one-time Stripe purchase that unlocks reports and exports for one tax year. Checkout uses a Stripe Payment Link plus a signed webhook, so the backend never calls the Stripe API and needs no Stripe secret key (prod has no outbound internet). Design, webhook rules and the Stripe setup runbook: [docs/tax-year-pass.md](docs/tax-year-pass.md).
+
+| Env var | Purpose |
+| --- | --- |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`) |
+| `APP_TAX_YEAR_PASS_PAYMENT_LINK_URL` | Payment Link URL (`https://buy.stripe.com/...`) |
+| `APP_TAX_YEAR_PASS_PAYMENT_LINK_ID` | That Payment Link's id (`plink_...`). The webhook ignores checkout sessions from any other link. |
+| `APP_TAX_YEAR_PASS_PRICE_CENTS` | Optional display price in minor units, e.g. `3900` |
+| `APP_TAX_YEAR_PASS_PRICE_CURRENCY` | Optional display currency, e.g. `CAD` |
+
+Set the webhook secret, Payment Link URL and Payment Link id together, or leave all three blank to disable checkout: `POST .../checkout` and the webhook then return `503`. The app refuses to start on a partial or malformed set, so add the Payment Link id secret before deploying to an environment that already has the other two. CI passes them from optional GitHub environment secrets: `DEV_STRIPE_WEBHOOK_SECRET`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_URL`, `DEV_TAX_YEAR_PASS_PAYMENT_LINK_ID`, `DEV_TAX_YEAR_PASS_PRICE_CENTS` and `DEV_TAX_YEAR_PASS_PRICE_CURRENCY`, with `PROD_` equivalents for prod.
+
+Local webhook testing with the Stripe CLI:
+
+```bash
+stripe login
+stripe listen --forward-to localhost:8080/api/v1/billing/stripe/webhook
+# Export the printed whsec_... as STRIPE_WEBHOOK_SECRET, set APP_TAX_YEAR_PASS_PAYMENT_LINK_URL
+# and APP_TAX_YEAR_PASS_PAYMENT_LINK_ID to a test-mode Payment Link's URL and plink_ id, then start
+# the backend.
+```
+
+Start purchases from the app's Unlock button so the Payment Link carries a real pass id. The webhook route is public and skips CSRF and the legal-agreement check; the `Stripe-Signature` header is its only authentication. It only applies `mode=payment` checkout sessions whose `payment_link` is the configured id, so `stripe trigger checkout.session.completed` is acknowledged and ignored.
 
 ## CI/CD (GitHub Actions)
 

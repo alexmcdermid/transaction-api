@@ -28,7 +28,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -53,10 +52,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional
 public class TradeService {
-
-    private static final BigDecimal OPTION_MULTIPLIER = BigDecimal.valueOf(100);
-    private static final BigDecimal DAYS_IN_YEAR = BigDecimal.valueOf(365);
-    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TradeRepository tradeRepository;
     private final TradeHistoryRepository tradeHistoryRepository;
@@ -944,37 +939,11 @@ public class TradeService {
     }
 
     private BigDecimal calculatePnl(Trade trade) {
-        BigDecimal movement = trade.getExitPrice().subtract(trade.getEntryPrice());
-        if (trade.getDirection() == TradeDirection.SHORT) {
-            movement = movement.negate();
-        }
-        BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
-        BigDecimal gross = movement.multiply(trade.getQuantity()).multiply(multiplier);
         BigDecimal fees = trade.getFees() != null ? trade.getFees() : BigDecimal.ZERO;
-        BigDecimal marginFee = calculateMarginFee(trade);
-        return gross.subtract(fees).subtract(marginFee).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateMarginFee(Trade trade) {
-        BigDecimal marginRate = trade.getMarginRate();
-        if (marginRate == null || marginRate.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        if (trade.getOpenedAt() == null || trade.getClosedAt() == null) {
-            return BigDecimal.ZERO;
-        }
-        long daysHeld = ChronoUnit.DAYS.between(trade.getOpenedAt(), trade.getClosedAt());
-        if (daysHeld <= 0) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal notional = toTradeNotional(trade);
-        if (notional == null || notional.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal yearFraction = BigDecimal.valueOf(daysHeld)
-                .divide(DAYS_IN_YEAR, 10, RoundingMode.HALF_UP);
-        BigDecimal rate = marginRate.divide(ONE_HUNDRED, 10, RoundingMode.HALF_UP);
-        return notional.multiply(rate).multiply(yearFraction).setScale(2, RoundingMode.HALF_UP);
+        return TradeCalculations.grossPnl(trade)
+                .subtract(fees)
+                .subtract(TradeCalculations.marginInterest(trade))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumPnl(List<Trade> trades, BigDecimal cadToUsdRate) {
@@ -1008,36 +977,21 @@ public class TradeService {
     }
 
     private BigDecimal toUsdMarginFee(Trade trade, BigDecimal cadToUsdRate) {
-        BigDecimal marginFee = calculateMarginFee(trade);
+        BigDecimal marginFee = TradeCalculations.marginInterest(trade);
         Currency currency = trade.getCurrency() == null ? Currency.USD : trade.getCurrency();
         BigDecimal rate = currency == Currency.CAD ? cadToUsdRate : BigDecimal.ONE;
         return marginFee.multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal toUsdNotional(Trade trade, BigDecimal cadToUsdRate) {
-        if (trade.getEntryPrice() == null || trade.getQuantity() == null) {
+        BigDecimal notional = TradeCalculations.notional(trade);
+        if (notional == null) {
             return null;
         }
-        BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
-        BigDecimal notional = trade.getEntryPrice()
-                .multiply(trade.getQuantity())
-                .multiply(multiplier)
-                .abs();
         if (trade.getCurrency() == Currency.CAD) {
             return notional.multiply(cadToUsdRate);
         }
         return notional;
-    }
-
-    private BigDecimal toTradeNotional(Trade trade) {
-        if (trade.getEntryPrice() == null || trade.getQuantity() == null) {
-            return null;
-        }
-        BigDecimal multiplier = trade.getAssetType() == AssetType.OPTION ? OPTION_MULTIPLIER : BigDecimal.ONE;
-        return trade.getEntryPrice()
-                .multiply(trade.getQuantity())
-                .multiply(multiplier)
-                .abs();
     }
 
     private BigDecimal computePnlPercent(BigDecimal totalPnl, BigDecimal totalNotional) {
@@ -1053,7 +1007,7 @@ public class TradeService {
     }
 
     private TradeResponse toResponse(Trade trade) {
-        BigDecimal pnlPercent = computePnlPercent(trade.getRealizedPnl(), toTradeNotional(trade));
+        BigDecimal pnlPercent = computePnlPercent(trade.getRealizedPnl(), TradeCalculations.notional(trade));
         return new TradeResponse(
                 trade.getId(),
                 trade.getSymbol(),

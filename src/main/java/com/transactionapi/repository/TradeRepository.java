@@ -3,6 +3,7 @@ package com.transactionapi.repository;
 import com.transactionapi.model.Trade;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +37,23 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
     List<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(String userId, LocalDate start, LocalDate end);
 
     Optional<Trade> findByIdAndUserId(UUID id, String userId);
-    
+
+    /** Repurchase review candidates: every account, no report filters, inclusive open-date window. */
+    List<Trade> findByUserIdAndSymbolInAndOpenedAtBetween(
+            String userId,
+            Collection<String> symbols,
+            LocalDate openedFrom,
+            LocalDate openedThrough
+    );
+
+    @Query("""
+        select extract(year from t.closedAt) as taxYear, count(t) as closedTradeCount
+        from Trade t
+        where t.userId = :userId
+        group by extract(year from t.closedAt)
+        """)
+    List<TaxYearTradeCountProjection> countClosedTradesByTaxYear(@Param("userId") String userId);
+
     @Query("select count(t) from Trade t where t.userId = :userId")
     int countByUserId(@Param("userId") String userId);
 
@@ -273,5 +290,10 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
         String getPeriod();
         BigDecimal getPnl();
         Integer getTrades();
+    }
+
+    interface TaxYearTradeCountProjection {
+        Integer getTaxYear();
+        Long getClosedTradeCount();
     }
 }

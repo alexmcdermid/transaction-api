@@ -10,6 +10,11 @@ public final class ApiPaths {
     public static final String TRADES = API_V1 + "/trades";
     public static final String ADMIN = API_V1 + "/admin";
     public static final String ADMIN_USERS = ADMIN + "/users";
+    public static final String BILLING = API_V1 + "/billing";
+    public static final String BILLING_TAX_YEAR_PASSES = BILLING + "/tax-year-passes";
+    public static final String BILLING_STRIPE_WEBHOOK = BILLING + "/stripe/webhook";
+    public static final String REPORTS = API_V1 + "/reports";
+    public static final String REPORTS_TAX_YEARS = REPORTS + "/tax-years";
     public static final String SHARES = API_V1 + "/shares";
     public static final String USERS = API_V1 + "/users";
     public static final String USER_ME = USERS + "/me";

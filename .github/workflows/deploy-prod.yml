@@ -52,6 +52,11 @@ jobs:
           APP_FX_SOURCE: "dynamo"
           APP_AWS_REGION: ${{ secrets.AWS_REGION }}
           APP_FX_DYNAMO_TABLE: "ExchangeRates"
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}
+          APP_TAX_YEAR_PASS_PAYMENT_LINK_URL: ${{ secrets.PROD_TAX_YEAR_PASS_PAYMENT_LINK_URL }}
+          APP_TAX_YEAR_PASS_PAYMENT_LINK_ID: ${{ secrets.PROD_TAX_YEAR_PASS_PAYMENT_LINK_ID }}
+          APP_TAX_YEAR_PASS_PRICE_CENTS: ${{ secrets.PROD_TAX_YEAR_PASS_PRICE_CENTS }}
+          APP_TAX_YEAR_PASS_PRICE_CURRENCY: ${{ secrets.PROD_TAX_YEAR_PASS_PRICE_CURRENCY }}
         run: |
           set -euo pipefail
           python - <<'PY' > /tmp/apprunner-backend.json
@@ -90,6 +95,11 @@ jobs:
           
           optional = {
               "APP_SECURITY_ADMIN_EMAILS": optional("APP_SECURITY_ADMIN_EMAILS"),
+              "STRIPE_WEBHOOK_SECRET": optional("STRIPE_WEBHOOK_SECRET"),
+              "APP_TAX_YEAR_PASS_PAYMENT_LINK_URL": optional("APP_TAX_YEAR_PASS_PAYMENT_LINK_URL"),
+              "APP_TAX_YEAR_PASS_PAYMENT_LINK_ID": optional("APP_TAX_YEAR_PASS_PAYMENT_LINK_ID"),
+              "APP_TAX_YEAR_PASS_PRICE_CENTS": optional("APP_TAX_YEAR_PASS_PRICE_CENTS"),
+              "APP_TAX_YEAR_PASS_PRICE_CURRENCY": optional("APP_TAX_YEAR_PASS_PRICE_CURRENCY"),
           }
           env.update({k: v for k, v in optional.items() if v})
           

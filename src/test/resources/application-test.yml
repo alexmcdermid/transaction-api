@@ -10,6 +10,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        # The PostgreSQL dialect binds an Instant as a UTC wall-clock Timestamp, and H2 stores that in the JVM's
+        # time zone, shifting every written instant by the local UTC offset. H2 stores OffsetDateTime exactly.
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP_WITH_TIMEZONE
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -22,3 +26,13 @@ app:
     jwt:
       enabled: false
     allow-header-auth: true
+  # Billing stays off by default, even when a developer's shell exports the Stripe env vars from
+  # local webhook testing. Tests that need checkout enable it with @TestPropertySource.
+  billing:
+    stripe:
+      webhook-secret: ""
+    tax-year-pass:
+      payment-link-url: ""
+      payment-link-id: ""
+      price-cents: ""
+      price-currency: ""

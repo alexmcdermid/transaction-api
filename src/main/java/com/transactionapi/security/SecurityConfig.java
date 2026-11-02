@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
@@ -83,6 +84,8 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", ApiPaths.HEALTH, ApiPaths.AUTH_CSRF, ApiPaths.AUTH_LOGIN, ApiPaths.AUTH_LOGOUT).permitAll()
+                // Stripe authenticates the webhook with its Stripe-Signature header, not a session.
+                .requestMatchers(HttpMethod.POST, ApiPaths.BILLING_STRIPE_WEBHOOK).permitAll()
                 .requestMatchers(HttpMethod.GET, ApiPaths.SHARES + "/*").permitAll()
                 // Exact path only: /users/me/* sub-routes stay authenticated.
                 .requestMatchers(HttpMethod.GET, ApiPaths.USER_ME).permitAll()
@@ -122,6 +125,10 @@ public class SecurityConfig {
             if (StringUtils.hasText(request.getHeader("Authorization"))) {
                 return false;
             }
+            // Server-to-server call that never carries the browser's session cookie or CSRF token.
+            if ("POST".equals(method) && ApiPaths.BILLING_STRIPE_WEBHOOK.equals(request.getRequestURI())) {
+                return false;
+            }
             if (allowHeaderAuth
                     && environment.acceptsProfiles(Profiles.of("local", "test"))
                     && StringUtils.hasText(request.getHeader(headerName))) {
@@ -137,6 +144,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "X-User-Id"));
+        // The frontend names downloaded CSV exports from this header.
+        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
