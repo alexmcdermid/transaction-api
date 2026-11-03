@@ -261,41 +261,29 @@ public class TradeService {
      */
     public PnlSummaryResponse summarize(String userId, YearMonth month) {
         List<Trade> trades;
-        List<Trade> marginTrades;
-        LocalDate start = null;
-        LocalDate end = null;
         if (month != null) {
-            start = month.atDay(1);
-            end = month.atEndOfMonth();
+            LocalDate start = month.atDay(1);
+            LocalDate end = month.atEndOfMonth();
             trades = tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(userId, start, end);
-            marginTrades = tradeRepository.findMarginTradesHeldBetween(userId, start, end);
         } else {
             trades = tradeRepository.findAllForUser(userId);
-            marginTrades = trades;
         }
         BigDecimal cadToUsdRate = exchangeRateService.cadToUsd();
 
+        // Each trade nets only the margin accrued in its closing month, on its close date. Stored realizedPnl
+        // and the year stats keep the full margin.
         Map<LocalDate, PnlBucketTotals> byDay = new TreeMap<>(Comparator.reverseOrder());
         Map<YearMonth, PnlBucketTotals> byMonth = new TreeMap<>(Comparator.reverseOrder());
         for (Trade trade : trades) {
-            BigDecimal pnlBeforeMargin = toUsd(trade, cadToUsdRate).add(toUsdMarginFee(trade, cadToUsdRate));
+            BigDecimal marginFee = toUsdAmount(trade, closingMonthMarginFee(trade), cadToUsdRate);
+            BigDecimal pnl = toUsd(trade, cadToUsdRate)
+                    .add(toUsdMarginFee(trade, cadToUsdRate))
+                    .subtract(marginFee);
             BigDecimal notional = toUsdNotional(trade, cadToUsdRate);
             byDay.computeIfAbsent(trade.getClosedAt(), key -> new PnlBucketTotals())
-                    .addTrade(pnlBeforeMargin, notional);
+                    .addTrade(pnl, notional, marginFee);
             byMonth.computeIfAbsent(YearMonth.from(trade.getClosedAt()), key -> new PnlBucketTotals())
-                    .addTrade(pnlBeforeMargin, notional);
-        }
-        for (Trade trade : marginTrades) {
-            for (MarginCharge charge : monthlyMarginCharges(trade)) {
-                if (!isWithin(charge.chargedOn(), start, end)) {
-                    continue;
-                }
-                BigDecimal usdMarginFee = toUsdAmount(trade, charge.amount(), cadToUsdRate);
-                byDay.computeIfAbsent(charge.chargedOn(), key -> new PnlBucketTotals())
-                        .addMarginCharge(usdMarginFee);
-                byMonth.computeIfAbsent(YearMonth.from(charge.chargedOn()), key -> new PnlBucketTotals())
-                        .addMarginCharge(usdMarginFee);
-            }
+                    .addTrade(pnl, notional, marginFee);
         }
 
         List<PnlBucketResponse> daily = byDay.entrySet().stream()
@@ -465,7 +453,14 @@ public class TradeService {
                 scopedYear,
                 scopedMonth != null ? scopedMonth.toString() : null,
                 day != null ? day.toString() : null,
-                sumMarginChargedBetween(userId, startDate, endDate.minusDays(1), cadToUsdRate)
+                sumMarginFees(
+                        tradeRepository.findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(
+                                userId,
+                                startDate,
+                                endDate.minusDays(1)
+                        ),
+                        cadToUsdRate
+                )
         );
     }
 
@@ -985,52 +980,29 @@ public class TradeService {
     }
 
     /**
-     * Splits a trade's margin fee into monthly charges. Each month's share is charged on the close date
-     * when the trade closes that month, otherwise on the month's last day. Shares round cumulatively so the
-     * charges always add up to the trade's margin fee.
+     * The part of a trade's margin fee accrued in the month it closes. Earlier months' share is rounded
+     * on its own and subtracted, so the closing-month share plus the earlier share equals the margin fee.
      */
-    private List<MarginCharge> monthlyMarginCharges(Trade trade) {
+    private BigDecimal closingMonthMarginFee(Trade trade) {
         BigDecimal totalMarginFee = calculateMarginFee(trade);
-        if (totalMarginFee.signum() <= 0) {
-            return List.of();
-        }
         LocalDate openedAt = trade.getOpenedAt();
-        LocalDate closedAt = trade.getClosedAt();
-        BigDecimal daysHeld = BigDecimal.valueOf(ChronoUnit.DAYS.between(openedAt, closedAt));
-        List<MarginCharge> charges = new ArrayList<>();
-        BigDecimal chargedSoFar = BigDecimal.ZERO;
-        LocalDate accrualStart = openedAt;
-        while (accrualStart.isBefore(closedAt)) {
-            LocalDate nextMonthStart = YearMonth.from(accrualStart).plusMonths(1).atDay(1);
-            LocalDate accrualEnd = closedAt.isBefore(nextMonthStart) ? closedAt : nextMonthStart;
-            LocalDate chargedOn = closedAt.isBefore(nextMonthStart) ? closedAt : nextMonthStart.minusDays(1);
-            BigDecimal daysAccrued = BigDecimal.valueOf(ChronoUnit.DAYS.between(openedAt, accrualEnd));
-            BigDecimal chargedThroughMonth = totalMarginFee.multiply(daysAccrued)
-                    .divide(daysHeld, 2, RoundingMode.HALF_UP);
-            BigDecimal amount = chargedThroughMonth.subtract(chargedSoFar);
-            if (amount.signum() > 0) {
-                charges.add(new MarginCharge(chargedOn, amount));
-            }
-            chargedSoFar = chargedThroughMonth;
-            accrualStart = accrualEnd;
+        LocalDate closingMonthStart = trade.getClosedAt().withDayOfMonth(1);
+        if (totalMarginFee.signum() <= 0 || !openedAt.isBefore(closingMonthStart)) {
+            return totalMarginFee;
         }
-        return charges;
+        BigDecimal daysHeld = BigDecimal.valueOf(ChronoUnit.DAYS.between(openedAt, trade.getClosedAt()));
+        BigDecimal daysBeforeClosingMonth = BigDecimal.valueOf(ChronoUnit.DAYS.between(openedAt, closingMonthStart));
+        BigDecimal chargedBeforeClosingMonth = totalMarginFee.multiply(daysBeforeClosingMonth)
+                .divide(daysHeld, 2, RoundingMode.HALF_UP);
+        return totalMarginFee.subtract(chargedBeforeClosingMonth);
     }
 
-    private BigDecimal sumMarginChargedBetween(String userId, LocalDate start, LocalDate end, BigDecimal cadToUsdRate) {
-        BigDecimal total = BigDecimal.ZERO;
-        for (Trade trade : tradeRepository.findMarginTradesHeldBetween(userId, start, end)) {
-            for (MarginCharge charge : monthlyMarginCharges(trade)) {
-                if (isWithin(charge.chargedOn(), start, end)) {
-                    total = total.add(toUsdAmount(trade, charge.amount(), cadToUsdRate));
-                }
-            }
-        }
-        return total.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private static boolean isWithin(LocalDate date, LocalDate start, LocalDate end) {
-        return (start == null || !date.isBefore(start)) && (end == null || !date.isAfter(end));
+    private BigDecimal sumMarginFees(List<Trade> trades, BigDecimal cadToUsdRate) {
+        return trades.stream()
+                .map(trade -> toUsdMarginFee(trade, cadToUsdRate))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumPnl(List<Trade> trades, BigDecimal cadToUsdRate) {
@@ -1130,26 +1102,19 @@ public class TradeService {
         );
     }
 
-    private record MarginCharge(LocalDate chargedOn, BigDecimal amount) {
-    }
-
     private static final class PnlBucketTotals {
         private BigDecimal pnl = BigDecimal.ZERO;
         private BigDecimal notional = BigDecimal.ZERO;
         private BigDecimal marginFee = BigDecimal.ZERO;
         private int trades;
 
-        private void addTrade(BigDecimal pnlBeforeMargin, BigDecimal tradeNotional) {
-            pnl = pnl.add(pnlBeforeMargin);
+        private void addTrade(BigDecimal tradePnl, BigDecimal tradeNotional, BigDecimal tradeMarginFee) {
+            pnl = pnl.add(tradePnl);
             if (tradeNotional != null) {
                 notional = notional.add(tradeNotional);
             }
+            marginFee = marginFee.add(tradeMarginFee);
             trades++;
-        }
-
-        private void addMarginCharge(BigDecimal usdMarginFee) {
-            pnl = pnl.subtract(usdMarginFee);
-            marginFee = marginFee.add(usdMarginFee);
         }
 
         private PnlBucketResponse toResponse(String period) {
