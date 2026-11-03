@@ -16,6 +16,7 @@ public record AggregateStatsResponse(
         java.time.LocalDate fxDate,
         Integer year,
         String month,
-        String day
+        String day,
+        BigDecimal marginFee
 ) {
 }

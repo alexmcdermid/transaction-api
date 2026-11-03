@@ -527,6 +527,20 @@ class TradeServiceTest {
                 .containsExactly("9.00", "29.00", "17.00");
     }
 
+    @Test
+    void scopedStatsReportMarginChargedInTheYear() {
+        // 31 days in Dec 2023 and 10 days in Jan 2024 at $1.00/day.
+        createMarginTrade(LocalDate.of(2023, 12, 1), LocalDate.of(2024, 1, 11));
+
+        AggregateStatsResponse stats2024 = tradeService.getScopedAggregateStats(USER_ID, 2024, null, null);
+        assertThat(stats2024.marginFee()).isEqualByComparingTo("10.00");
+        assertThat(stats2024.totalPnl()).isEqualByComparingTo("59.00");
+
+        AggregateStatsResponse stats2023 = tradeService.getScopedAggregateStats(USER_ID, 2023, null, null);
+        assertThat(stats2023.marginFee()).isEqualByComparingTo("31.00");
+        assertThat(stats2023.tradeCount()).isZero();
+    }
+
     private void createMarginTrade(LocalDate openedAt, LocalDate closedAt) {
         tradeService.createTrade(
                 new TradeRequest(

@@ -383,6 +383,7 @@ public class TradeService {
                 exchangeRateService.lastUpdatedOn(),
                 null,
                 null,
+                null,
                 null
         );
     }
@@ -463,7 +464,8 @@ public class TradeService {
                 exchangeRateService.lastUpdatedOn(),
                 scopedYear,
                 scopedMonth != null ? scopedMonth.toString() : null,
-                day != null ? day.toString() : null
+                day != null ? day.toString() : null,
+                sumMarginChargedBetween(userId, startDate, endDate.minusDays(1), cadToUsdRate)
         );
     }
 
@@ -1013,6 +1015,18 @@ public class TradeService {
             accrualStart = accrualEnd;
         }
         return charges;
+    }
+
+    private BigDecimal sumMarginChargedBetween(String userId, LocalDate start, LocalDate end, BigDecimal cadToUsdRate) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (Trade trade : tradeRepository.findMarginTradesHeldBetween(userId, start, end)) {
+            for (MarginCharge charge : monthlyMarginCharges(trade)) {
+                if (isWithin(charge.chargedOn(), start, end)) {
+                    total = total.add(toUsdAmount(trade, charge.amount(), cadToUsdRate));
+                }
+            }
+        }
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static boolean isWithin(LocalDate date, LocalDate start, LocalDate end) {
