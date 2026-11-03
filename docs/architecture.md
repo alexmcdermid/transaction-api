@@ -233,12 +233,12 @@ erDiagram
 
 ## AI PR review
 
-A `/ai-review` comment from the repo owner, a member or a collaborator runs the workflow from `main` with a read-only checkout and `pull-requests: write`. Each selected provider posts its own review as a comment; it never approves or blocks.
+A `/ai-review` comment from the repo owner runs the workflow from `main` with a read-only checkout and `pull-requests: write`. Each selected provider posts its own review as a comment; it never approves or blocks.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor reviewer as Owner, member or collaborator
+    actor reviewer as Repo owner
     participant github as GitHub
     participant job as ai-review job
     participant anthropic as Anthropic API
