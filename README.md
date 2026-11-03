@@ -36,6 +36,8 @@ See [DEV.md](DEV.md) for setup instructions, API documentation, and deployment d
 
 This API supports the companion React frontend: [alexmcdermid/tradingView](https://github.com/alexmcdermid/tradingView).
 
+For diagrams of the runtime, sign-in flow, CI/CD, and data model across both repos, see [Architecture](docs/architecture.md).
+
 For the target private App Runner deployment, see [Private App Runner + Neon Deployment](docs/private-app-runner-neon.md).
 
 For AWS budget alerts and App Runner auto-pause guardrails, see [AWS Budget Guardrail Runbook](docs/aws-budget-guardrail.md).
