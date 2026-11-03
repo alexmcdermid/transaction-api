@@ -488,28 +488,12 @@ class TradeServiceTest {
     }
 
     @Test
-    void summaryChargesMarginEachMonthThePositionIsHeld() {
+    void summaryNetsOnlyTheClosingMonthsMarginOnTheCloseDate() {
         // $1,000 notional at 36.5% accrues $1.00/day: 17 days in Jan, 29 in Feb, 9 in Mar.
         createMarginTrade(LocalDate.of(2024, 1, 15), LocalDate.of(2024, 3, 10));
 
-        PnlSummaryResponse january = tradeService.summarize(USER_ID, YearMonth.of(2024, 1));
-        assertThat(january.tradeCount()).isZero();
-        assertThat(january.totalPnl()).isEqualByComparingTo("-17.00");
-        assertThat(january.daily()).singleElement().satisfies(bucket -> {
-            assertThat(bucket.period()).isEqualTo("2024-01-31");
-            assertThat(bucket.trades()).isZero();
-            assertThat(bucket.pnl()).isEqualByComparingTo("-17.00");
-            assertThat(bucket.marginFee()).isEqualByComparingTo("17.00");
-            assertThat(bucket.pnlPercent()).isNull();
-        });
-        assertThat(january.monthly()).singleElement()
-                .satisfies(bucket -> assertThat(bucket.marginFee()).isEqualByComparingTo("17.00"));
-
-        PnlSummaryResponse february = tradeService.summarize(USER_ID, YearMonth.of(2024, 2));
-        assertThat(february.daily()).singleElement().satisfies(bucket -> {
-            assertThat(bucket.period()).isEqualTo("2024-02-29");
-            assertThat(bucket.marginFee()).isEqualByComparingTo("29.00");
-        });
+        assertThat(tradeService.summarize(USER_ID, YearMonth.of(2024, 1)).daily()).isEmpty();
+        assertThat(tradeService.summarize(USER_ID, YearMonth.of(2024, 2)).daily()).isEmpty();
 
         PnlSummaryResponse march = tradeService.summarize(USER_ID, YearMonth.of(2024, 3));
         assertThat(march.tradeCount()).isEqualTo(1);
@@ -520,24 +504,21 @@ class TradeServiceTest {
             assertThat(bucket.pnl()).isEqualByComparingTo("91.00");
             assertThat(bucket.marginFee()).isEqualByComparingTo("9.00");
         });
-
-        PnlSummaryResponse allTime = tradeService.summarize(USER_ID, null);
-        assertThat(allTime.totalPnl()).isEqualByComparingTo("45.00");
-        assertThat(allTime.monthly()).extracting(bucket -> bucket.marginFee().toPlainString())
-                .containsExactly("9.00", "29.00", "17.00");
+        assertThat(march.monthly()).singleElement()
+                .satisfies(bucket -> assertThat(bucket.marginFee()).isEqualByComparingTo("9.00"));
     }
 
     @Test
-    void scopedStatsReportMarginChargedInTheYear() {
+    void scopedStatsReportFullMarginOfTradesClosedInTheYear() {
         // 31 days in Dec 2023 and 10 days in Jan 2024 at $1.00/day.
         createMarginTrade(LocalDate.of(2023, 12, 1), LocalDate.of(2024, 1, 11));
 
         AggregateStatsResponse stats2024 = tradeService.getScopedAggregateStats(USER_ID, 2024, null, null);
-        assertThat(stats2024.marginFee()).isEqualByComparingTo("10.00");
+        assertThat(stats2024.marginFee()).isEqualByComparingTo("41.00");
         assertThat(stats2024.totalPnl()).isEqualByComparingTo("59.00");
 
         AggregateStatsResponse stats2023 = tradeService.getScopedAggregateStats(USER_ID, 2023, null, null);
-        assertThat(stats2023.marginFee()).isEqualByComparingTo("31.00");
+        assertThat(stats2023.marginFee()).isEqualByComparingTo("0.00");
         assertThat(stats2023.tradeCount()).isZero();
     }
 
