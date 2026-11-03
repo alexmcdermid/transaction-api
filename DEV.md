@@ -290,6 +290,8 @@ If `deploy-pr-dev` fails with `AccessDeniedException` for `apprunner:ResumeServi
 
 ## Architecture
 
+Diagrams for both repos: [docs/architecture.md](docs/architecture.md).
+
 ### Dev App Runner PR Lifecycle
 - Goal: leave Neon running, but pause dev frontend/backend App Runner when shared dev is idle.
 - PRs resume both dev App Runner services and deploy the PR image into that repo's dev service.
