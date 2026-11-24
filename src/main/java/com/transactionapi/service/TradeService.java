@@ -102,7 +102,7 @@ public class TradeService {
      */
     public List<TradeResponse> moveTradesToClosedAt(List<UUID> tradeIds, LocalDate closedAt, String userId) {
         Set<UUID> uniqueTradeIds = new LinkedHashSet<>(tradeIds);
-        List<Trade> trades = tradeRepository.findByIdInAndUserId(uniqueTradeIds, userId);
+        List<Trade> trades = tradeRepository.findByIdInAndUserIdLockedForUpdate(uniqueTradeIds, userId);
         if (trades.size() != uniqueTradeIds.size()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Trade not found");
         }
