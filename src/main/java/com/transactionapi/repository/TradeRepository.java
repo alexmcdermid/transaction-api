@@ -3,6 +3,7 @@ package com.transactionapi.repository;
 import com.transactionapi.model.Trade;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +37,9 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
     List<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(String userId, LocalDate start, LocalDate end);
 
     Optional<Trade> findByIdAndUserId(UUID id, String userId);
-    
+
+    List<Trade> findByIdInAndUserId(Collection<UUID> ids, String userId);
+
     @Query("select count(t) from Trade t where t.userId = :userId")
     int countByUserId(@Param("userId") String userId);
 

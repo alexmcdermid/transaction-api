@@ -12,11 +12,14 @@ import tools.jackson.databind.ObjectMapper;
 import com.transactionapi.constants.ApiPaths;
 import com.transactionapi.constants.AssetType;
 import com.transactionapi.constants.Currency;
+import com.transactionapi.constants.OptionType;
 import com.transactionapi.constants.TradeDirection;
 import com.transactionapi.dto.TradeRequest;
 import com.transactionapi.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -803,6 +806,136 @@ class TradeControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void movesSeveralTradesToOneClosedAtInOneRequest() throws Exception {
+        String owner = "bulk-move-owner";
+        LocalDate openedAt = LocalDate.of(2024, 2, 1);
+        LocalDate originalClosedAt = LocalDate.of(2024, 2, 5);
+        LocalDate targetClosedAt = LocalDate.of(2024, 2, 11);
+        // 36.5% margin on $1,000 costs $1 a day, so the move from 4 to 10 days held must cut P&L by $6.
+        String marginStockId = createTrade(owner, new TradeRequest(
+                "MRGN", AssetType.STOCK, Currency.USD, TradeDirection.LONG, 10,
+                new BigDecimal("100.00"), new BigDecimal("110.00"), BigDecimal.ZERO, new BigDecimal("36.5"),
+                null, null, null, null, openedAt, originalClosedAt, null
+        ));
+        String optionExpiringOnCloseId = createTrade(owner, new TradeRequest(
+                "EXPC", AssetType.OPTION, Currency.USD, TradeDirection.LONG, 1,
+                new BigDecimal("1.00"), new BigDecimal("2.00"), BigDecimal.ZERO, null,
+                null, OptionType.CALL, new BigDecimal("50"), originalClosedAt, openedAt, originalClosedAt, null
+        ));
+        String optionWithLaterExpiryId = createTrade(owner, new TradeRequest(
+                "LATE", AssetType.OPTION, Currency.USD, TradeDirection.LONG, 1,
+                new BigDecimal("1.00"), new BigDecimal("2.00"), BigDecimal.ZERO, null,
+                null, OptionType.PUT, new BigDecimal("50"), LocalDate.of(2024, 3, 15), openedAt, originalClosedAt, null
+        ));
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/closed-at")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", owner)
+                                .content(moveTradesBody(targetClosedAt, marginStockId, optionExpiringOnCloseId, optionWithLaterExpiryId))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("date", targetClosedAt.toString())
+                                .header("X-User-Id", owner)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.items[?(@.symbol == 'MRGN')].realizedPnl").value(90.0))
+                .andExpect(jsonPath("$.items[?(@.symbol == 'EXPC')].expiryDate").value("2024-02-11"))
+                .andExpect(jsonPath("$.items[?(@.symbol == 'LATE')].expiryDate").value("2024-03-15"));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/" + marginStockId + "/history")
+                                .header("X-User-Id", owner)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].action").value("EDIT"))
+                .andExpect(jsonPath("$[1].closedAt").value("2024-02-11"));
+    }
+
+    @Test
+    void moveTradesToClosedAtChangesNothingWhenAnyTradeIsRejected() throws Exception {
+        String owner = "bulk-move-all-or-nothing";
+        String otherUser = "bulk-move-intruder";
+        LocalDate originalClosedAt = LocalDate.of(2024, 4, 10);
+        String openedEarlyId = createTrade(owner, stockTrade("EARLY", LocalDate.of(2024, 4, 1), originalClosedAt));
+        String openedLateId = createTrade(owner, stockTrade("LATER", LocalDate.of(2024, 4, 8), originalClosedAt));
+        String otherUsersTradeId = createTrade(otherUser, stockTrade("OTHER", LocalDate.of(2024, 4, 1), originalClosedAt));
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/closed-at")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", owner)
+                                .content(moveTradesBody(LocalDate.of(2024, 4, 5), openedEarlyId, openedLateId))
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Close date cannot be before open date: LATER"));
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/closed-at")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", owner)
+                                .content(moveTradesBody(LocalDate.of(2024, 4, 12), openedEarlyId, otherUsersTradeId))
+                )
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+                        put(ApiPaths.TRADES + "/closed-at")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", owner)
+                                .content(moveTradesBody(LocalDate.of(2024, 4, 12)))
+                )
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("date", originalClosedAt.toString())
+                                .header("X-User-Id", owner)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get(ApiPaths.TRADES + "/paged")
+                                .param("date", originalClosedAt.toString())
+                                .header("X-User-Id", otherUser)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    private String createTrade(String userId, TradeRequest request) throws Exception {
+        String body = mockMvc.perform(
+                        post(ApiPaths.TRADES)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-User-Id", userId)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).get("id").asText();
+    }
+
+    private String moveTradesBody(LocalDate closedAt, String... tradeIds) throws Exception {
+        return objectMapper.writeValueAsString(Map.of("tradeIds", List.of(tradeIds), "closedAt", closedAt.toString()));
+    }
+
+    private static TradeRequest stockTrade(String symbol, LocalDate openedAt, LocalDate closedAt) {
+        return new TradeRequest(
+                symbol, AssetType.STOCK, Currency.USD, TradeDirection.LONG, 1,
+                new BigDecimal("10.00"), new BigDecimal("11.00"), BigDecimal.ZERO, null,
+                null, null, null, null, openedAt, closedAt, null
+        );
     }
 
     private static RequestPostProcessor jwtUser(String subject, String email) {
