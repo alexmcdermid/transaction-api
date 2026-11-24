@@ -1,6 +1,7 @@
 package com.transactionapi.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.transactionapi.constants.AssetType;
@@ -1110,10 +1111,12 @@ class TradeServiceTest {
 
         AggregateStatsResponse stats = tradeService.getAggregateStats(USER_ID);
 
-        assertThat(stats.totalPnl()).isGreaterThan(new BigDecimal("170.00"));
-        assertThat(stats.totalPnl()).isLessThan(new BigDecimal("180.00"));
-        assertThat(stats.tradeCount()).isEqualTo(2);
         assertThat(stats.cadToUsdRate()).isNotNull();
+        // 100 USD from AAPL plus 100 CAD from RY at whatever rate the service loaded, which is live in this test.
+        BigDecimal expectedTotalPnl = new BigDecimal("100.00")
+                .add(new BigDecimal("100.00").multiply(stats.cadToUsdRate()));
+        assertThat(stats.totalPnl()).isCloseTo(expectedTotalPnl, within(new BigDecimal("0.01")));
+        assertThat(stats.tradeCount()).isEqualTo(2);
     }
 
     @Test

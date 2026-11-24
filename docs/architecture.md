@@ -233,28 +233,4 @@ erDiagram
 
 ## AI PR review
 
-A `/ai-review` comment from the repo owner runs the workflow from `main` with a read-only checkout and `pull-requests: write`. Each selected provider posts its own review as a comment; it never approves or blocks.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor reviewer as Repo owner
-    participant github as GitHub
-    participant job as ai-review job
-    participant anthropic as Anthropic API
-    participant openai as OpenAI API
-
-    reviewer->>github: Comment /ai-review [light|standard|deep|security] [anthropic|openai|both]
-    github->>job: issue_comment created, workflow runs from main
-    job->>github: Add eyes reaction to the comment
-    job->>github: Get PR, changed files, and full files at head for standard, deep and security
-    par Anthropic selected
-        job->>anthropic: Messages API with JSON schema output
-        anthropic-->>job: Summary and findings
-    and OpenAI selected
-        job->>openai: Responses API with JSON schema output, security tier uses Daybreak Blue
-        openai-->>job: Summary and findings
-    end
-    job->>github: Post one COMMENT review per provider, with inline comments
-    Note over job,github: If GitHub rejects inline positions, findings move into the review body. A failed provider posts a PR comment instead.
-```
+A `/ai-review` comment from the repo owner runs the workflow from `main` with `contents: read` and `pull-requests: write`. The workflow calls the shared [`alexmcdermid/ai-review`](https://github.com/alexmcdermid/ai-review) action, which reads the pull request through the GitHub API without checking out its code. Each selected provider posts its own review as a comment; it never approves or blocks. See the action's [architecture doc](https://github.com/alexmcdermid/ai-review/blob/main/docs/architecture.md) for how a run works.
