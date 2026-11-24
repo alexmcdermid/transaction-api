@@ -32,10 +32,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -92,6 +94,46 @@ public class TradeService {
         Trade saved = tradeRepository.saveAndFlush(trade);
         recordHistory(saved, TradeHistoryAction.EDIT);
         return toResponse(saved);
+    }
+
+    /**
+     * Moves every given trade to one close date, all or nothing. An option whose expiry was its close
+     * date keeps them together; any other expiry stays put. Trades already on the date are left untouched.
+     */
+    public List<TradeResponse> moveTradesToClosedAt(List<UUID> tradeIds, LocalDate closedAt, String userId) {
+        Set<UUID> uniqueTradeIds = new LinkedHashSet<>(tradeIds);
+        List<Trade> trades = tradeRepository.findByIdInAndUserIdLockedForUpdate(uniqueTradeIds, userId);
+        if (trades.size() != uniqueTradeIds.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Trade not found");
+        }
+
+        List<String> symbolsOpenedAfterClosedAt = trades.stream()
+                .filter(trade -> trade.getOpenedAt().isAfter(closedAt))
+                .map(Trade::getSymbol)
+                .toList();
+        if (!symbolsOpenedAfterClosedAt.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Close date cannot be before open date: " + String.join(", ", symbolsOpenedAfterClosedAt)
+            );
+        }
+
+        List<Trade> movedTrades = new ArrayList<>();
+        for (Trade trade : trades) {
+            if (closedAt.equals(trade.getClosedAt())) {
+                continue;
+            }
+            if (trade.getAssetType() == AssetType.OPTION && Objects.equals(trade.getExpiryDate(), trade.getClosedAt())) {
+                trade.setExpiryDate(closedAt);
+            }
+            trade.setClosedAt(closedAt);
+            trade.setRealizedPnl(calculatePnl(trade));
+            movedTrades.add(trade);
+        }
+        tradeRepository.saveAllAndFlush(movedTrades)
+                .forEach(trade -> recordHistory(trade, TradeHistoryAction.EDIT));
+
+        return trades.stream().map(this::toResponse).toList();
     }
 
     public PagedResponse<TradeResponse> listTrades(String userId, int page, int size) {

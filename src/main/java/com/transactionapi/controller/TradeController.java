@@ -6,6 +6,7 @@ import com.transactionapi.constants.TradeSortField;
 import com.transactionapi.dto.AccountStatsResponse;
 import com.transactionapi.dto.AggregateStatsResponse;
 import com.transactionapi.dto.InferredAccountTradeCountsResponse;
+import com.transactionapi.dto.MoveTradesClosedAtRequest;
 import com.transactionapi.dto.PagedResponse;
 import com.transactionapi.dto.PnlSummaryResponse;
 import com.transactionapi.dto.TaxablePnlResponse;
@@ -105,6 +106,16 @@ public class TradeController {
         String userId = userIdResolver.requireUserId(authentication);
         userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
         return tradeService.updateTrade(tradeId, request, userId);
+    }
+
+    @PutMapping("/closed-at")
+    public List<TradeResponse> moveTradesToClosedAt(
+            Authentication authentication,
+            @Valid @RequestBody MoveTradesClosedAtRequest request
+    ) {
+        String userId = userIdResolver.requireUserId(authentication);
+        userService.ensureUserExists(userId, userIdResolver.resolveEmail(authentication));
+        return tradeService.moveTradesToClosedAt(request.tradeIds(), request.closedAt(), userId);
     }
 
     @GetMapping("/{tradeId}/history")

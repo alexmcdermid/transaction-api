@@ -3,6 +3,7 @@ package com.transactionapi.repository;
 import com.transactionapi.model.Trade;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +37,19 @@ public interface TradeRepository extends JpaRepository<Trade, UUID>, JpaSpecific
     List<Trade> findByUserIdAndClosedAtBetweenOrderByClosedAtDesc(String userId, LocalDate start, LocalDate end);
 
     Optional<Trade> findByIdAndUserId(UUID id, String userId);
-    
+
+    // Row locks taken in id order, so overlapping bulk moves queue up instead of each reading stale dates.
+    // Native SQL because Hibernate renders a JPA write lock as Postgres' FOR NO KEY UPDATE, which H2 rejects.
+    @Query(value = """
+        select t.*
+        from trades t
+        where t.id in (:ids)
+          and t.user_id = :userId
+        order by t.id
+        for update
+        """, nativeQuery = true)
+    List<Trade> findByIdInAndUserIdLockedForUpdate(@Param("ids") Collection<UUID> ids, @Param("userId") String userId);
+
     @Query("select count(t) from Trade t where t.userId = :userId")
     int countByUserId(@Param("userId") String userId);
 
